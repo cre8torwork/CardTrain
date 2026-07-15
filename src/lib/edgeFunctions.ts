@@ -9,6 +9,8 @@ export const EDGE_FUNCTIONS = {
   updateSiteSettings: `${SUPABASE_FUNCTIONS_BASE}/update-site-settings`,
   userPoints: `${SUPABASE_FUNCTIONS_BASE}/user-points`,
   mfaEmail: `${SUPABASE_FUNCTIONS_BASE}/mfa-email`,
+  signCheckout: `${SUPABASE_FUNCTIONS_BASE}/sign-checkout`,
+  checkoutResponse: `${SUPABASE_FUNCTIONS_BASE}/checkout-response`,
 } as const;
 
 // Max login attempts before temporary cooldown (enforced server-side by edge function)
