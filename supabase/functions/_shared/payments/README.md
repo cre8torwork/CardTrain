@@ -30,6 +30,14 @@ vault:
 - `CYBS_SA_SECRET_KEY` — Secure Acceptance Secret Key
 - `CYBS_SA_ENDPOINT` — `https://testsecureacceptance.cybersource.com/silent/pay`
   (test) or `https://secureacceptance.cybersource.com/silent/pay` (live)
+- `SITE_URL` — public site origin for the confirmation page's "Return" link
+  (optional; defaults to `https://cardtrain.com`)
+
+## Edge functions to deploy
+
+`create-order`, `sign-checkout`, `checkout-response` (plus the existing ones).
+Point the Secure Acceptance profile's **customer response page** at the deployed
+`checkout-response` URL. Apply the `orders` + `payment_events` migration first.
 
 ## ⚠️ Status
 
