@@ -59,8 +59,8 @@ follow-on operations**, not the go-live gate.
 ### Out of scope
 - Subscriptions, saved cards / tokenised reuse, AVS logic (all MIDs Ignore AVS).
 - Changing the draws/shop points mechanics (only *adding* a card path to shop).
-- REST / Unified Checkout (not provisioned; revisit only if GPAP confirms it —
-  open Q4).
+- Unified Checkout (GPAP-confirmed: not available on any MID). REST exists but is
+  not used for the initial charge (that's Secure Acceptance).
 
 ### Non-goals / explicit deletions
 - Remove the Readdy Stripe scaffolding (`@stripe/react-stripe-js`) and Firebase
@@ -73,8 +73,8 @@ follow-on operations**, not the go-live gate.
 | D1 | Sequencing | **Cards first** (Secure Acceptance on Supabase/Deno) → pass GPAP → go live. Wallets fast-follow. |
 | D2 | Buy Points model | **Sale** (auth + capture in one; instant point credit). |
 | D3 | Shop goods model | **Authorize now, capture on shipment** (adds void / reversal / refund). |
-| D4 | Networks | **All five** in the test plan: Visa, Mastercard, JCB, Amex, UnionPay (subject to Q3). |
-| D5 | Backend | **Hybrid** — Deno for initial charges; one **PHP** service (official Simple Order SDK) for follow-ons and, later, wallets. |
+| D4 | Networks | **Visa + Mastercard only** (GPAP-confirmed 2026-07-20 — the MID carries only these; the test plan lists more because it is a universal template). **3 cases × 2 cards = 6 transactions** on the cards MID. |
+| D5 | Backend | **Hybrid** — Deno for initial charges; one **PHP** service (official Simple Order SDK) for follow-ons and, later, wallets. (REST *also* carries the follow-ons — see §8 — but PHP is needed for wallets regardless, so it stays the one money backend.) |
 
 ## 4. Architecture
 
@@ -154,8 +154,13 @@ Postgres (Supabase): orders, payment_events
   receipt URL → **verify the response signature** → read `decision` +
   `reason_code` → update the order → (Buy Points) credit CTP → render
   confirmation.
-- **3D Secure** is provisioned on `…200`; enable Secure Acceptance payer auth.
-  ECI blocking (0167) behaviour is an **open question** (Q5) — do not infer.
+- **3D Secure is effectively mandatory.** MID `…200` has **ECI blocking (0167)**,
+  which GPAP confirmed (2026-07-20) blocks any transaction whose **ECI value is 0,
+  1, 6 or 7** — i.e. everything except a *fully authenticated* 3DS result (Visa ECI
+  `05`, Mastercard ECI `02`). "Attempted" and "not authenticated" outcomes are
+  declined by GPAP. So we **must** run Secure Acceptance payer auth (3DS) and expect
+  non-fully-authenticated attempts to come back as declines (mapped via §7). Design
+  the flow so a legitimate cardholder reaches full authentication.
 - **PCI scope: SAQ A-EP** (card fields render on our page). Confirm with Card
   Train before they sign.
 
@@ -174,10 +179,9 @@ and exactly this mapping:
 - **3DS logos** (Visa Secure, Mastercard Identity Check) sit **near the CHECKOUT
   button** (Website Review requirement).
 
-> Note: the plan's bottom paragraph swaps the "Test case 2/3" labels relative to
-> its own tables. The **message ↔ reason-code mapping above is internally
-> consistent across both places** and is what we build; we will still confirm it
-> with GPAP (Q2).
+> **GPAP-approved (2026-07-20):** GPAP confirmed this mapping is acceptable and
+> that the test-plan wording is only a suggestion — so the messages above are what
+> we ship. (The plan's swapped "Test case 2/3" labels were a template artifact.)
 
 ## 8. Follow-on operations — PHP service (M2)
 
@@ -188,9 +192,11 @@ and exactly this mapping:
 - **Refunds route back through the same MID.** **Partial refunds accumulate**
   against the captured amount — never exceed it. Every call writes a
   `payment_events` row.
-- If GPAP confirms REST is enabled (Q4), this service *may* instead run on Deno
-  via hand-rolled JWT + MLE — but the default and recommendation is the PHP
-  service, since it is also required for wallets.
+- GPAP confirmed (2026-07-20) that **both Simple Order and REST carry void / refund
+  / authorization reversal**, and that **no MID has Unified Checkout**. REST would
+  let follow-ons run on Deno (hand-rolled JWT + MLE), but the PHP service stays the
+  plan — it is required for wallets anyway, so keeping all server-to-server money
+  calls on one official-SDK backend is cleaner than hand-rolling MLE on money code.
 
 ## 9. Wallets — Track B (M3, same PHP service)
 
@@ -204,18 +210,21 @@ and exactly this mapping:
 
 ## 10. GPAP connectivity test deliverable (the go-live gate)
 
-Test cards (replace `X` → `0`): Visa `4000 00XX XXXX 2503`, MC
-`5200 00XX XXXX 2151`, JCB `3338 00XX XXXX 0569`, Amex `3400 00XX XXX2 534`
-(CVV 1234), UnionPay `621X X325 7857 4424`. Any future expiry; CVV 123 (Amex 1234).
+Currency: **HKD** (GPAP-confirmed). Test cards (replace `X` → `0`), for the two
+networks the MID carries: Visa `4000 00XX XXXX 2503`, Mastercard
+`5200 00XX XXXX 2151`. Any future expiry; CVV `123`.
 
-**Matrix — 3 cases × 5 networks, minus Amex in Case 3 = 14 transactions.**
-Submit the exact trigger amounts (confirm HKD units, Q6):
+**Matrix — 3 cases × 2 networks = 6 transactions** (GPAP-confirmed 2026-07-20:
+3 transactions per enabled card type). Submit the exact trigger amounts:
 
-| Case | Message | Amount → network |
+| Case | Message | Amount (HKD) — both Visa & Mastercard |
 |---|---|---|
-| 1 · success (rc 100) | Transaction successful. | **10** on Visa/MC/JCB/Amex/UnionPay |
-| 2 · system (rc 150) | Transaction unsuccessful, please try again… | **4091** Visa/MC/JCB · **2009** Amex · **9000.91** UnionPay |
-| 3 · issuer (rc 204) | Transaction rejected, please contact your bank… | **4051** Visa/MC/JCB · **9000.51** UnionPay |
+| 1 · success (rc 100) | Transaction successful. | **10** |
+| 2 · system (rc 150) | Transaction unsuccessful, please try again… | **4091** |
+| 3 · issuer (rc 204) | Transaction rejected, please contact your bank… | **4051** |
+
+(JCB / Amex / UnionPay in the plan are ignored — the plan is a universal template;
+this MID carries only Visa + Mastercard.)
 
 For each: **step-by-step screenshots** from the final checkout page → confirmation
 page (status + correct message + `reference_number`). Assemble into a
@@ -224,21 +233,25 @@ iterate on comments. Verify each result in EBC test (URL per Q7). Then Website
 Review, then production health test (real card, min amount, funds landing in the
 merchant bank account — not just an approved auth), on each rail.
 
-## 11. Open questions for GPAP (ask, never infer) — send before building the harness
+## 11. GPAP answers (resolved 2026-07-20)
 
-1. Plan says "**6** testing cases" but lists **3** — confirm the count.
-2. Confirm the reason-code → message mapping and the swapped case labels.
-3. Which **networks are actually enabled** on MID `…200`? (Provisioning said
-   Visa + MC; the plan tests 5.) Determines the real test matrix.
-4. Which API carries **void / refund / authorization reversal** — REST or Simple
-   Order? Is **REST / Unified Checkout** enabled at all? *(Confirms M2's stack.)*
-5. What is **"ECI blocking (0167)"**? It decides which real transactions decline.
-6. Are the **test amounts in HKD dollars** (e.g. HK$4,091.00)?
-7. Which **EBC URL** — the plan's `ebctest.cybersource.com/ebctest` or our
-   earlier note's `ebc2test.cybersource.com/ebc2`?
+1. **Test cases:** 3 transactions per enabled card type → 2 cards × 3 = **6
+   transactions** on the cards MID.
+2. **Message mapping:** our §7 mapping is **approved**; the test-plan wording is a
+   suggestion only.
+3. **Networks:** the MID carries **Visa + Mastercard only** — the plan lists more
+   because it is a universal template.
+4. **Follow-on API:** **both Simple Order and REST** carry void / refund /
+   authorization reversal; **no MID has Unified Checkout**.
+5. **ECI blocking (0167):** blocks transactions with **ECI value 0, 1, 6 or 7** —
+   i.e. everything except a fully authenticated 3DS result (Visa `05` / MC `02`).
+   Full 3DS authentication is effectively required (see §6).
+6. **Currency:** test in **HKD**.
+7. **EBC URL:** *(still to confirm)* — the test plan cites
+   `https://ebctest.cybersource.com/ebctest/login/` for verifying results.
 
-Plus standing blockers: **EBC2 admin activation link + credentials** (Profile ID,
-Access Key, Secret Key); **chase the 7 missing attachments** (Website
+**Still pending (blockers):** **EBC2 admin activation link + credentials** (Profile
+ID, Access Key, Secret Key); the **outstanding attachments** (Website
 Requirement/T&Cs, Apple Pay 3.0 guide, Google Pay Quick Start, sample screenshots
 PPT, EBC key-download guide, FAQ, 3DS logo assets).
 
@@ -246,8 +259,9 @@ PPT, EBC key-download guide, FAQ, 3DS logo assets).
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Follow-on API forces PHP into the go-live path | Medium | Buy Points (Sale) needs no follow-on → goes live on Deno regardless; confirm Q4 early |
-| Networks not all enabled on `…200` | Medium | Q3 before sizing the harness; default Visa+MC |
+| Non-fully-authenticated 3DS blocked by ECI 0167 → legit cardholders declined | **High** | 3DS payer auth wired so cardholders reach full authentication (Visa 05 / MC 02); test the challenge flow |
+| ~~Follow-on API forces PHP into go-live~~ | Resolved | Both REST & Simple Order carry follow-ons; Buy Points needs none anyway |
+| ~~Networks not all enabled on `…200`~~ | Resolved | GPAP confirmed Visa + MC only → 6-transaction matrix |
 | Double-charge on retry | **High** | Unique `reference_number` per request + one-auth-per-order in the state machine; explicit test |
 | Points credited more than once | **High** | Credit server-side, idempotent on `cybersource_request_id` |
 | Signed-string byte mismatch → opaque 401/deny | **High** | Byte-match to guide; unit-test the signer against sandbox in isolation |
@@ -257,7 +271,7 @@ PPT, EBC key-download guide, FAQ, 3DS logo assets).
 
 ## 13. Success criteria
 
-- All 14 connectivity-test transactions produce the correct decision **and** the
+- All 6 connectivity-test transactions produce the correct decision **and** the
   exact GPAP message + `reference_number` on the confirmation page; verified in
   EBC; accepted by GPAP eCommerce.
 - Website Review passed; production credentials released.
