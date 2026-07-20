@@ -16,6 +16,30 @@ export async function createBuyPointsOrder(packageId: string, quantity: number):
   return orderId;
 }
 
+export interface ShopShipping {
+  recipientName: string;
+  phone: string;
+  flatFloor: string;
+  building: string;
+  address: string;
+  district: string;
+  notes: string;
+}
+
+/** Create a shop-goods order (card). Amount is derived server-side from each product's HKD price. */
+export async function createShopCardOrder(
+  items: { productId: string; quantity: number }[],
+  shipping: ShopShipping,
+): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('create-order', {
+    body: { kind: 'shop_goods', items, shipping },
+  });
+  if (error) throw error;
+  const orderId = (data as { orderId?: string })?.orderId;
+  if (!orderId) throw new Error((data as { error?: string })?.error || 'Failed to create order');
+  return orderId;
+}
+
 /** Get the server-signed Secure Acceptance field set for an order. */
 export async function signCheckout(orderId: string): Promise<SignedCheckout> {
   const { data, error } = await supabase.functions.invoke('sign-checkout', {
@@ -25,6 +49,18 @@ export async function signCheckout(orderId: string): Promise<SignedCheckout> {
   const d = data as { endpoint?: string; fields?: Record<string, string>; error?: string };
   if (!d?.endpoint || !d?.fields) throw new Error(d?.error || 'Failed to sign checkout');
   return { endpoint: d.endpoint, fields: d.fields };
+}
+
+/** Submit a Google Pay token for an order. Backend is pending the wallet certs. */
+export async function submitGooglePay(orderId: string, token: string): Promise<{ ok: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke('google-pay', {
+    body: { orderId, token },
+  });
+  if (error) {
+    return { ok: false, message: error.message ?? 'Google Pay failed' };
+  }
+  const d = data as { ok?: boolean; message?: string; error?: string };
+  return { ok: !!d?.ok, message: d?.message ?? d?.error ?? '' };
 }
 
 /** CyberSource card_type code for the networks this MID accepts (Visa 001, Mastercard 002). */

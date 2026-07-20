@@ -6,7 +6,8 @@ export interface ShopProduct {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // CTP points price
+  hkdPriceMinor?: number | null; // HKD retail price in cents for card purchase; null = card disabled
   image: string;
   images: string[];
   category: string;
@@ -56,6 +57,7 @@ function mapProduct(row: any): ShopProduct {
     name: row.name,
     description: row.description || '',
     price: row.price,
+    hkdPriceMinor: row.hkd_price_minor ?? null,
     image: row.image || '',
     images: row.images || [],
     category: row.category || '',
@@ -140,6 +142,7 @@ export const useShopStore = create<ShopStore>((set, get) => ({
         name: data.name,
         description: data.description,
         price: data.price,
+        hkd_price_minor: data.hkdPriceMinor ?? null,
         image: data.image,
         images: data.images || [],
         category: data.category,
@@ -163,6 +166,7 @@ export const useShopStore = create<ShopStore>((set, get) => ({
       if (data.name !== undefined) updateData.name = data.name;
       if (data.description !== undefined) updateData.description = data.description;
       if (data.price !== undefined) updateData.price = data.price;
+      if (data.hkdPriceMinor !== undefined) updateData.hkd_price_minor = data.hkdPriceMinor;
       if (data.image !== undefined) updateData.image = data.image;
       if (data.images !== undefined) updateData.images = data.images;
       if (data.category !== undefined) updateData.category = data.category;

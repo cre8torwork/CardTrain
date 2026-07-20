@@ -19,6 +19,7 @@ export default function ShopProductModal({ product, onSave, onClose }: ShopProdu
     name: '',
     description: '',
     price: '',
+    hkdPrice: '',    // HKD retail price for card purchase (dollars); blank = card disabled
     image: '',       // 封面圖（從 images 中選一張）
     images: [] as string[],
     category: '',
@@ -41,6 +42,7 @@ export default function ShopProductModal({ product, onSave, onClose }: ShopProdu
         name: product.name,
         description: product.description,
         price: String(product.price),
+        hkdPrice: product.hkdPriceMinor != null ? String(product.hkdPriceMinor / 100) : '',
         image: product.image,
         images: imgs,
         category: product.category,
@@ -164,6 +166,7 @@ export default function ShopProductModal({ product, onSave, onClose }: ShopProdu
         name: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
+        hkdPriceMinor: form.hkdPrice.trim() ? Math.round(Number(form.hkdPrice) * 100) : null,
         image: form.image,
         images: form.images,
         category: form.category.trim(),
@@ -372,6 +375,18 @@ export default function ShopProductModal({ product, onSave, onClose }: ShopProdu
                 onChange={(e) => handleChange('price', e.target.value)}
                 placeholder="0"
                 min="1"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">港幣售價 (HK$)</label>
+              <input
+                type="number"
+                value={form.hkdPrice}
+                onChange={(e) => handleChange('hkdPrice', e.target.value)}
+                placeholder="留空 = 不可用信用卡購買"
+                min="0"
+                step="0.01"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
               />
             </div>

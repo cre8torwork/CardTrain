@@ -6,6 +6,7 @@ import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
 import CardPaymentForm from '../../components/feature/CardPaymentForm';
+import GooglePayButton from '../../components/feature/GooglePayButton';
 import { createBuyPointsOrder, signCheckout, type SignedCheckout } from '../../lib/checkout';
 
 interface PointsPackage {
@@ -81,6 +82,18 @@ export default function BuyPointsPage() {
     setCheckoutError('');
     setShowPaymentModal(true);
   };
+
+  const gpayCreateOrder = useCallback(
+    () => createBuyPointsOrder(selectedPackage!.id, quantity),
+    [selectedPackage, quantity],
+  );
+  const handleGpayResult = useCallback(
+    (r: { ok: boolean; message: string }) => {
+      if (r.ok) { setShowPaymentModal(false); navigate('/user'); }
+      else setCheckoutError(r.message);
+    },
+    [navigate],
+  );
 
   const handlePayNow = async () => {
     if (!selectedPackage) return;
@@ -479,6 +492,15 @@ export default function BuyPointsPage() {
                 )}
 
                 <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
+
+                <div className="flex items-center gap-3 my-3 text-xs text-gray-300">
+                  <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
+                </div>
+                <GooglePayButton
+                  amountMinor={totalHKD * 100}
+                  createOrder={gpayCreateOrder}
+                  onResult={handleGpayResult}
+                />
               </>
             )}
 

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/hooks/useShopStore';
 import { placeShopOrder } from '@/hooks/useShopStore';
+import CardPaymentForm from '@/components/feature/CardPaymentForm';
+import { createShopCardOrder, signCheckout, type SignedCheckout } from '@/lib/checkout';
 
 interface ShopCheckoutModalProps {
   cartItems: CartItem[];
@@ -50,6 +52,13 @@ export default function ShopCheckoutModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'points' | 'card'>('points');
+  const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
+  const [cardBusy, setCardBusy] = useState(false);
+
+  const cardAvailable = cartItems.every((i) => i.product.hkdPriceMinor != null);
+  const hkdTotalMinor = cartItems.reduce((s, i) => s + (i.product.hkdPriceMinor ?? 0) * i.quantity, 0);
+  const hkdTotalLabel = `HK$ ${(hkdTotalMinor / 100).toFixed(2)}`;
 
   const handleChange = (field: keyof ShippingForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -85,6 +94,28 @@ export default function ShopCheckoutModal({
       setError(result.error || t('shop.checkout.submitError'));
     }
     setSubmitting(false);
+  };
+
+  const handleCardCheckout = async () => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setCardBusy(true);
+    setError('');
+    try {
+      const orderId = await createShopCardOrder(
+        cartItems.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+        form,
+      );
+      const signed = await signCheckout(orderId);
+      setCheckout(signed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCardBusy(false);
+    }
   };
 
   if (success) {
@@ -139,6 +170,28 @@ export default function ShopCheckoutModal({
             <div className="flex items-center justify-between mt-1">
               <span className="text-xs text-gray-500">{t('shop.checkout.remainingAfter')}</span>
               <span className="text-xs font-semibold text-gray-600">{(userPoints - totalPoints).toLocaleString()} CTP</span>
+            </div>
+          </div>
+
+          {/* Payment method */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2">{t('shop.checkout.paymentMethod')}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setPaymentMethod('points'); setCheckout(null); setError(''); }}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${paymentMethod === 'points' ? 'border-rose-400 bg-rose-50 text-rose-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >
+                {t('shop.checkout.payWithPoints')}<br /><span className="text-xs font-normal">{totalPoints.toLocaleString()} CTP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (cardAvailable) { setPaymentMethod('card'); setError(''); } }}
+                disabled={!cardAvailable}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'card' ? 'border-rose-400 bg-rose-50 text-rose-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >
+                {t('shop.checkout.payByCard')}<br /><span className="text-xs font-normal">{cardAvailable ? hkdTotalLabel : t('shop.checkout.cardUnavailable')}</span>
+              </button>
             </div>
           </div>
 
@@ -235,26 +288,44 @@ export default function ShopCheckoutModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            {t('shop.checkout.cancel')}
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="flex-2 flex-grow py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm hover:from-rose-600 hover:to-pink-600 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {submitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <i className="ri-loader-4-line animate-spin"></i>{t('shop.checkout.processing')}
-              </span>
-            ) : (
-              t('shop.checkout.confirm', { n: totalPoints.toLocaleString() })
-            )}
-          </button>
+        <div className="px-6 py-4 border-t border-gray-100">
+          {paymentMethod === 'card' && checkout ? (
+            <CardPaymentForm endpoint={checkout.endpoint} fields={checkout.fields} amountLabel={hkdTotalLabel} />
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                {t('shop.checkout.cancel')}
+              </button>
+              {paymentMethod === 'card' ? (
+                <button
+                  onClick={handleCardCheckout}
+                  disabled={cardBusy || !cardAvailable}
+                  className="flex-grow py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm hover:from-rose-600 hover:to-pink-600 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {cardBusy ? (
+                    <span className="flex items-center justify-center gap-2"><i className="ri-loader-4-line animate-spin"></i>{t('shop.checkout.processing')}</span>
+                  ) : (
+                    t('shop.checkout.payByCardAmount', { amount: hkdTotalLabel })
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="flex-grow py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm hover:from-rose-600 hover:to-pink-600 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2"><i className="ri-loader-4-line animate-spin"></i>{t('shop.checkout.processing')}</span>
+                  ) : (
+                    t('shop.checkout.confirm', { n: totalPoints.toLocaleString() })
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

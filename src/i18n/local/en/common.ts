@@ -1033,6 +1033,11 @@ const translation = {
   "shop.checkout.processing": "Processing...",
   "shop.checkout.confirm": "Confirm Order ({n} CTP)",
   "shop.checkout.cancel": "Cancel",
+  "shop.checkout.paymentMethod": "Payment Method",
+  "shop.checkout.payWithPoints": "Pay with Points",
+  "shop.checkout.payByCard": "Pay by Card",
+  "shop.checkout.payByCardAmount": "Pay {amount}",
+  "shop.checkout.cardUnavailable": "Card not available",
 
   // ── Share Social / Canvas extras ──
   "share.socialSingle": "🎉 I drew {rarity} rarity \"{prize}\" on Card Train! Come try your luck! #CardTrain #TCG #LuckyDraw",
