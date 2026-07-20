@@ -63,6 +63,27 @@ export async function submitGooglePay(orderId: string, token: string): Promise<{
   return { ok: !!d?.ok, message: d?.message ?? d?.error ?? '' };
 }
 
+/** Apple Pay merchant validation — server calls Apple with the Merchant Identity cert. Pending certs. */
+export async function validateApplePayMerchant(validationURL: string): Promise<unknown> {
+  const { data, error } = await supabase.functions.invoke('apple-pay-validate', {
+    body: { validationURL },
+  });
+  if (error) throw new Error(error.message ?? 'Apple Pay validation failed');
+  const d = data as { merchantSession?: unknown; error?: string };
+  if (!d?.merchantSession) throw new Error(d?.error ?? 'Apple Pay not available');
+  return d.merchantSession;
+}
+
+/** Submit an Apple Pay token for an order. Backend is pending the wallet certs. */
+export async function submitApplePay(orderId: string, token: unknown): Promise<{ ok: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke('apple-pay', {
+    body: { orderId, token },
+  });
+  if (error) return { ok: false, message: error.message ?? 'Apple Pay failed' };
+  const d = data as { ok?: boolean; message?: string; error?: string };
+  return { ok: !!d?.ok, message: d?.message ?? d?.error ?? '' };
+}
+
 /** CyberSource card_type code for the networks this MID accepts (Visa 001, Mastercard 002). */
 export function detectCardType(cardNumber: string): string | undefined {
   const n = cardNumber.replace(/\D/g, '');

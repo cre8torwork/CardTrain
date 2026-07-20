@@ -7,6 +7,7 @@ import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
 import CardPaymentForm from '../../components/feature/CardPaymentForm';
 import GooglePayButton from '../../components/feature/GooglePayButton';
+import ApplePayButton from '../../components/feature/ApplePayButton';
 import { createBuyPointsOrder, signCheckout, type SignedCheckout } from '../../lib/checkout';
 
 interface PointsPackage {
@@ -496,11 +497,18 @@ export default function BuyPointsPage() {
                 <div className="flex items-center gap-3 my-3 text-xs text-gray-300">
                   <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
                 </div>
-                <GooglePayButton
-                  amountMinor={totalHKD * 100}
-                  createOrder={gpayCreateOrder}
-                  onResult={handleGpayResult}
-                />
+                <div className="space-y-2">
+                  <ApplePayButton
+                    amountMinor={totalHKD * 100}
+                    createOrder={gpayCreateOrder}
+                    onResult={handleGpayResult}
+                  />
+                  <GooglePayButton
+                    amountMinor={totalHKD * 100}
+                    createOrder={gpayCreateOrder}
+                    onResult={handleGpayResult}
+                  />
+                </div>
               </>
             )}
 
