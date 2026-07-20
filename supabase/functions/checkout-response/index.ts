@@ -16,6 +16,43 @@ import { confirmationFor } from "../_shared/payments/reason-codes.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SA_SECRET_KEY = Deno.env.get("CYBS_SA_SECRET_KEY")!;
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cardtrain.com";
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+// The confirmation page GPAP screenshots: status + the exact message + the
+// reference number. No sensitive wording ever (guaranteed by confirmationFor).
+function confirmationPage(category: string, message: string): string {
+  const ok = category === "success";
+  const accent = ok ? "#059669" : "#dc2626";
+  const icon = ok ? "&#10003;" : "&#33;";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment ${ok ? "Successful" : "Result"} — Card Train</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#f8fafc;color:#0f172a;display:flex;min-height:100vh;align-items:center;justify-content:center}
+  .card{background:#fff;max-width:440px;width:calc(100% - 32px);border-radius:20px;
+    box-shadow:0 10px 40px rgba(0,0,0,.08);padding:40px 32px;text-align:center}
+  .badge{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    margin:0 auto 20px;font-size:36px;color:#fff;background:${accent}}
+  h1{font-size:20px;margin:0 0 12px}
+  p{color:#475569;line-height:1.6;margin:0 0 24px}
+  a{display:inline-block;padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#f43f5e,#ec4899);
+    color:#fff;text-decoration:none;font-weight:700}
+</style></head><body>
+<div class="card">
+  <div class="badge">${icon}</div>
+  <h1>${ok ? "Payment Successful" : "Payment Not Completed"}</h1>
+  <p>${escapeHtml(message)}</p>
+  <a href="${escapeHtml(SITE_URL)}">Return to Card Train</a>
+</div></body></html>`;
+}
+
+const htmlResponse = (body: string, status: number) =>
+  new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 
 async function creditPointsOnce(
   supabase: ReturnType<typeof createClient>,
@@ -51,10 +88,10 @@ serve(async (req: Request) => {
     new URLSearchParams(raw).forEach((v, k) => (fields[k] = v));
 
     if (!(await verifyResponseSignature(fields, SA_SECRET_KEY))) {
-      return new Response(JSON.stringify({ error: "signature verification failed" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return htmlResponse(
+        confirmationPage("retry", "We could not verify this transaction. Please try again."),
+        400,
+      );
     }
 
     const referenceNumber = fields.req_reference_number ?? "";
@@ -104,14 +141,11 @@ serve(async (req: Request) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ category: confirmation.category, message: confirmation.message, referenceNumber }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
+    return htmlResponse(confirmationPage(confirmation.category, confirmation.message), 200);
+  } catch (_e) {
+    return htmlResponse(
+      confirmationPage("retry", "Transaction unsuccessful, please try again..."),
+      500,
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
   }
 });

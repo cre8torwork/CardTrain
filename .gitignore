@@ -1,0 +1,13 @@
+# dependencies
+node_modules
+
+# build output
+out
+dist
+
+# generated
+auto-imports.d.ts
+
+# os / editor
+.DS_Store
+*.local

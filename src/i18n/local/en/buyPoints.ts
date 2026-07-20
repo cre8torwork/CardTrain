@@ -59,6 +59,16 @@ const translation = {
   "buyPoints.orderSummaryDesc": "Please confirm your purchase details",
   "buyPoints.payWithGlobalPayments": "Pay Securely via Global Payments",
   "buyPoints.redirectNote": "You will be redirected to Global Payments secure payment page",
+  "buyPoints.proceedToCard": "Pay by Card",
+  "buyPoints.preparingPayment": "Preparing secure payment…",
+  "buyPoints.cardNumber": "Card Number",
+  "buyPoints.cardMonth": "Month",
+  "buyPoints.cardYear": "Year",
+  "buyPoints.cardCvn": "CVV",
+  "buyPoints.payAmount": "Pay {amount}",
+  "buyPoints.securedByCybersource": "Secured by CyberSource · 3-D Secure",
+  "buyPoints.cardUnsupported": "Only Visa and Mastercard are accepted.",
+  "buyPoints.cardIncomplete": "Please enter a valid expiry date and CVV.",
 };
 
 export default translation;

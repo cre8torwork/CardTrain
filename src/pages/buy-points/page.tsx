@@ -5,6 +5,8 @@ import { useUserAuth } from '../../hooks/useUserAuth';
 import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
+import CardPaymentForm from '../../components/feature/CardPaymentForm';
+import { createBuyPointsOrder, signCheckout, type SignedCheckout } from '../../lib/checkout';
 
 interface PointsPackage {
   id: string;
@@ -32,8 +34,6 @@ const FAQ_ITEMS = [
   { q: 'buyPoints.faq.q5', a: 'buyPoints.faq.a5' },
 ];
 
-const GLOBAL_PAYMENTS_URL = 'https://go.globalpayments.com/en-hk/all-solutions';
-
 export default function BuyPointsPage() {
   const { t } = useTranslation();
   const { isLoggedIn, currentUser, loading } = useUserAuth();
@@ -45,6 +45,9 @@ export default function BuyPointsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<number | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   useEffect(() => {
     if (currentUser) {
@@ -74,7 +77,24 @@ export default function BuyPointsPage() {
       return;
     }
     if (!selectedPackage) return;
+    setCheckout(null);
+    setCheckoutError('');
     setShowPaymentModal(true);
+  };
+
+  const handlePayNow = async () => {
+    if (!selectedPackage) return;
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const orderId = await createBuyPointsOrder(selectedPackage.id, quantity);
+      const signed = await signCheckout(orderId);
+      setCheckout(signed);
+    } catch (e) {
+      setCheckoutError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const totalCTP = selectedPackage ? selectedPackage.ctp * quantity : 0;
@@ -432,17 +452,35 @@ export default function BuyPointsPage() {
               </div>
             </div>
 
-            <a
-              href={GLOBAL_PAYMENTS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg whitespace-nowrap cursor-pointer"
-            >
-              <i className="ri-bank-card-line text-lg"></i>
-              {t('buyPoints.payWithGlobalPayments')}
-            </a>
+            {checkout ? (
+              <CardPaymentForm
+                endpoint={checkout.endpoint}
+                fields={checkout.fields}
+                amountLabel={`HK$ ${totalHKD.toLocaleString()}`}
+              />
+            ) : (
+              <>
+                <button
+                  onClick={handlePayNow}
+                  disabled={checkoutLoading}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {checkoutLoading ? (
+                    <><i className="ri-loader-4-line animate-spin"></i>{t('buyPoints.preparingPayment')}</>
+                  ) : (
+                    <><i className="ri-bank-card-line text-lg"></i>{t('buyPoints.proceedToCard')}</>
+                  )}
+                </button>
 
-            <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
+                {checkoutError && (
+                  <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                    <i className="ri-error-warning-line flex-shrink-0"></i>{checkoutError}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
+              </>
+            )}
 
             <button
               onClick={() => setShowPaymentModal(false)}
