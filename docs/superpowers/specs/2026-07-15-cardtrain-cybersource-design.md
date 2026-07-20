@@ -143,9 +143,14 @@ Postgres (Supabase): orders, payment_events
   server-side**, generates the unique `reference_number`, sets `transaction_type`
   (`sale` for points, `authorization` for shop), and returns the field set signed
   with **HMAC-SHA256 over the comma-separated `signed_field_names`** using the
-  Secret Key. Everything except `card_number`, `card_cvn`, `card_expiry_*` is
-  signed. **Byte-match the signed string to the integration guide** — field order
-  and separators matter; a mismatch fails opaquely.
+  Secret Key. **Byte-match the signed string to the integration guide** — field
+  order and separators matter; a mismatch fails opaquely.
+- **Signed fields** (server-side) include `payment_method=card` and
+  `bill_to_forename / surname / email` — both required by CyberSource; the name and
+  email come from the logged-in user. **Unsigned fields** (entered in the browser,
+  never server-side): `card_type`, `card_number`, `card_expiry_date`, `card_cvn`.
+  *(bill_to address fields are AVS-related; all MIDs Ignore AVS, so we omit them
+  unless the sandbox profile demands them — confirm at first sandbox run.)*
 - The **browser form-POSTs card fields directly to CyberSource**
   (test `https://testsecureacceptance.cybersource.com/silent/pay`,
   live `https://secureacceptance.cybersource.com/silent/pay`). **Card data never
@@ -161,6 +166,13 @@ Postgres (Supabase): orders, payment_events
   declined by GPAP. So we **must** run Secure Acceptance payer auth (3DS) and expect
   non-fully-authenticated attempts to come back as declines (mapped via §7). Design
   the flow so a legitimate cardholder reaches full authentication.
+- **How 3DS is wired (confirmed against CyberSource docs):** it is enabled at the
+  **profile level** — "Check Payer Authentication" per card type in the Business
+  Center — and runs **automatically**. The Silent Order POST sends **no**
+  `payer_authentication_*` request fields (those are optional 3DS-2.0 tuning). So
+  this is a **profile-configuration task** (owner/GPAP: enable 3DS on the profile,
+  choose 3DS 2.0) plus reading the response — no request-side code. Store the
+  payer-authentication response data (kept 12 months) for chargeback defence.
 - **PCI scope: SAQ A-EP** (card fields render on our page). Confirm with Card
   Train before they sign.
 

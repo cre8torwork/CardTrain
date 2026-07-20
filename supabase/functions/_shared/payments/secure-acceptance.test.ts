@@ -10,6 +10,20 @@ import {
 
 const SECRET = 'test_secret_key_abc123';
 
+const baseInput = {
+  accessKey: 'AK',
+  profileId: 'PID',
+  transactionUuid: 'uuid-1',
+  signedDateTime: '2026-07-15T09:00:00Z',
+  locale: 'en',
+  transactionType: 'sale' as const,
+  referenceNumber: '0000000123',
+  amount: '10.00',
+  currency: 'HKD',
+  paymentMethod: 'card',
+  billTo: { forename: 'Test', surname: 'User', email: 'test@example.com' },
+};
+
 test('buildDataToSign joins name=value pairs in signed_field_names order', () => {
   const fields = {
     access_key: 'AK',
@@ -27,23 +41,18 @@ test('hmacSha256Base64 matches a Node crypto known-answer (cross-impl check)', a
 });
 
 test('buildSignedRequestFields produces a self-verifying signed field set', async () => {
-  const fields = await buildSignedRequestFields(
-    {
-      accessKey: 'AK',
-      profileId: 'PID',
-      transactionUuid: 'uuid-1',
-      signedDateTime: '2026-07-15T09:00:00Z',
-      locale: 'en',
-      transactionType: 'sale',
-      referenceNumber: '0000000123',
-      amount: '10.00',
-      currency: 'HKD',
-    },
-    SECRET,
-  );
+  const fields = await buildSignedRequestFields(baseInput, SECRET);
 
   assert.equal(fields.transaction_type, 'sale');
   assert.equal(fields.currency, 'HKD');
+  // payment_method is required by CyberSource and must be signed
+  assert.equal(fields.payment_method, 'card');
+  assert.ok(fields.signed_field_names.includes('payment_method'));
+  // bill_to name + email are required for card transactions and are signed server-side
+  assert.equal(fields.bill_to_email, 'test@example.com');
+  assert.ok(fields.signed_field_names.includes('bill_to_forename'));
+  assert.ok(fields.signed_field_names.includes('bill_to_surname'));
+  assert.ok(fields.signed_field_names.includes('bill_to_email'));
   assert.ok(fields.signature, 'signature is set');
   // card fields are never signed and never added server-side
   assert.ok(fields.unsigned_field_names.includes('card_number'));
@@ -54,39 +63,20 @@ test('buildSignedRequestFields produces a self-verifying signed field set', asyn
 
 test('verifyResponseSignature rejects a tampered signed field', async () => {
   const fields = await buildSignedRequestFields(
-    {
-      accessKey: 'AK',
-      profileId: 'PID',
-      transactionUuid: 'uuid-1',
-      signedDateTime: '2026-07-15T09:00:00Z',
-      locale: 'en',
-      transactionType: 'authorization',
-      referenceNumber: '0000000123',
-      amount: '10.00',
-      currency: 'HKD',
-    },
+    { ...baseInput, transactionType: 'authorization' },
     SECRET,
   );
-
   const tampered = { ...fields, amount: '9999.00' };
   assert.equal(await verifyResponseSignature(tampered, SECRET), false);
 });
 
-test('verifyResponseSignature rejects a wrong secret key', async () => {
-  const fields = await buildSignedRequestFields(
-    {
-      accessKey: 'AK',
-      profileId: 'PID',
-      transactionUuid: 'uuid-1',
-      signedDateTime: '2026-07-15T09:00:00Z',
-      locale: 'en',
-      transactionType: 'sale',
-      referenceNumber: '0000000123',
-      amount: '10.00',
-      currency: 'HKD',
-    },
-    SECRET,
-  );
+test('verifyResponseSignature rejects a tampered bill_to field', async () => {
+  const fields = await buildSignedRequestFields(baseInput, SECRET);
+  const tampered = { ...fields, bill_to_email: 'attacker@evil.com' };
+  assert.equal(await verifyResponseSignature(tampered, SECRET), false);
+});
 
+test('verifyResponseSignature rejects a wrong secret key', async () => {
+  const fields = await buildSignedRequestFields(baseInput, SECRET);
   assert.equal(await verifyResponseSignature(fields, 'wrong_secret'), false);
 });

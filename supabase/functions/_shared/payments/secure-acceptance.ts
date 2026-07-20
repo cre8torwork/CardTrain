@@ -27,6 +27,10 @@ const SIGNED_FIELD_NAMES = [
   'reference_number',
   'amount',
   'currency',
+  'payment_method',
+  'bill_to_forename',
+  'bill_to_surname',
+  'bill_to_email',
 ] as const;
 
 export interface SignedRequestInput {
@@ -39,6 +43,9 @@ export interface SignedRequestInput {
   referenceNumber: string;
   amount: string; // decimal string, e.g. "10.00"
   currency: string; // "HKD"
+  paymentMethod: string; // "card"
+  // Required for card transactions; known server-side for a logged-in user.
+  billTo: { forename: string; surname: string; email: string };
 }
 
 /** Build the exact string that gets HMAC-signed, in signed_field_names order. */
@@ -79,6 +86,10 @@ export async function buildSignedRequestFields(
     reference_number: input.referenceNumber,
     amount: input.amount,
     currency: input.currency,
+    payment_method: input.paymentMethod,
+    bill_to_forename: input.billTo.forename,
+    bill_to_surname: input.billTo.surname,
+    bill_to_email: input.billTo.email,
   };
   fields.signature = await hmacSha256Base64(secretKey, buildDataToSign(fields));
   return fields;

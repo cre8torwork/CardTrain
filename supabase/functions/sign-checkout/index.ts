@@ -78,7 +78,7 @@ serve(async (req: Request) => {
     // Re-derive the amount from our own order — never sign an amount the browser sent.
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, kind, amount_minor, currency, status")
+      .select("id, user_id, kind, amount_minor, currency, status")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -97,6 +97,17 @@ serve(async (req: Request) => {
       });
     }
 
+    // bill_to name + email are required by CyberSource. We pull them from the
+    // authenticated user; ideally capture them at order creation instead.
+    const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
+    const fullName = String(authUser?.user?.user_metadata?.full_name ?? "").trim();
+    const [forename, ...rest] = fullName.split(/\s+/);
+    const billTo = {
+      forename: forename || "Card",
+      surname: rest.join(" ") || "Holder",
+      email: authUser?.user?.email ?? "",
+    };
+
     const referenceNumber = newReferenceNumber();
     const fields = await buildSignedRequestFields(
       {
@@ -109,6 +120,8 @@ serve(async (req: Request) => {
         referenceNumber,
         amount: formatMinorUnits(order.amount_minor),
         currency: order.currency,
+        paymentMethod: "card",
+        billTo,
       },
       SA_SECRET_KEY,
     );
