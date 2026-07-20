@@ -43,7 +43,7 @@ const translation = {
   // ── Payment Info ──
   "buyPoints.paymentMethod": "付款方式",
   "buyPoints.paymentTitle": "安全可靠的付款體驗",
-  "buyPoints.paymentDesc": "我們使用 Global Payments 作為第三方支付平台，支援 Visa、Mastercard、UnionPay 及 Apple Pay 等多種付款方式。所有交易均經過加密處理，保障您的付款安全。",
+  "buyPoints.paymentDesc": "我們使用 Global Payments 作為第三方支付平台，支援 Visa、Mastercard、Apple Pay 及 Google Pay 付款方式。所有交易均經過加密處理，保障您的付款安全。",
 
   // ── Features ──
   "buyPoints.feature1Title": "SSL 加密交易",
@@ -61,7 +61,7 @@ const translation = {
   "buyPoints.faq.q1": "購買積分後多久會到帳？",
   "buyPoints.faq.a1": "付款成功後，積分會即時存入您的 Card Train 帳戶。您可以在「我的頁面」查看餘額，若未收到請聯絡客服。",
   "buyPoints.faq.q2": "支援哪些付款方式？",
-  "buyPoints.faq.a2": "我們透過 Global Payments 平台支援 Visa、Mastercard、UnionPay 及 Apple Pay 等多種付款方式。",
+  "buyPoints.faq.a2": "我們透過 Global Payments 平台支援 Visa、Mastercard、Apple Pay 及 Google Pay 付款方式。",
   "buyPoints.faq.q3": "購買積分可以退款嗎？",
   "buyPoints.faq.a3": "根據我們的退款政策，積分一經購買即不可退款。請在購買前確認所需金額，如有疑問請參閱退款政策頁面。",
   "buyPoints.faq.q4": "積分有使用期限嗎？",

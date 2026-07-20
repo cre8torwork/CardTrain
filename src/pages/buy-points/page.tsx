@@ -57,6 +57,19 @@ export default function BuyPointsPage() {
     }
   }, [currentUser, getPoints]);
 
+  // Hooks must run on every render — keep these above the loading early-return.
+  const gpayCreateOrder = useCallback(
+    () => createBuyPointsOrder(selectedPackage!.id, quantity),
+    [selectedPackage, quantity],
+  );
+  const handleGpayResult = useCallback(
+    (r: { ok: boolean; message: string }) => {
+      if (r.ok) { setShowPaymentModal(false); navigate('/user'); }
+      else setCheckoutError(r.message);
+    },
+    [navigate],
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
@@ -83,18 +96,6 @@ export default function BuyPointsPage() {
     setCheckoutError('');
     setShowPaymentModal(true);
   };
-
-  const gpayCreateOrder = useCallback(
-    () => createBuyPointsOrder(selectedPackage!.id, quantity),
-    [selectedPackage, quantity],
-  );
-  const handleGpayResult = useCallback(
-    (r: { ok: boolean; message: string }) => {
-      if (r.ok) { setShowPaymentModal(false); navigate('/user'); }
-      else setCheckoutError(r.message);
-    },
-    [navigate],
-  );
 
   const handlePayNow = async () => {
     if (!selectedPackage) return;
@@ -357,12 +358,12 @@ export default function BuyPointsPage() {
                   <span className="text-gray-600">Mastercard</span>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm">
-                  <i className="ri-bank-card-2-line text-blue-400 text-xl"></i>
-                  <span className="text-gray-600">UnionPay</span>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm">
                   <i className="ri-apple-line text-gray-800 text-xl"></i>
                   <span className="text-gray-600">Apple Pay</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm">
+                  <i className="ri-google-line text-blue-500 text-xl"></i>
+                  <span className="text-gray-600">Google Pay</span>
                 </div>
               </div>
             </div>
