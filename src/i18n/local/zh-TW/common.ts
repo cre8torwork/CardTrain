@@ -1033,6 +1033,11 @@ const translation = {
   "shop.checkout.processing": "處理中...",
   "shop.checkout.confirm": "確認下單 ({n} CTP)",
   "shop.checkout.cancel": "取消",
+  "shop.checkout.paymentMethod": "付款方式",
+  "shop.checkout.payWithPoints": "使用積分付款",
+  "shop.checkout.payByCard": "使用信用卡付款",
+  "shop.checkout.payByCardAmount": "支付 {amount}",
+  "shop.checkout.cardUnavailable": "不支援信用卡",
 
   // ── Share Social / Canvas extras ──
   "share.socialSingle": "🎉 我在 Card Train 火車卡抽中了 {rarity} 稀有度的「{prize}」！快來一起抽！ #CardTrain #火車卡 #抽卡",

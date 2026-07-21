@@ -1033,6 +1033,11 @@ const translation = {
   "shop.checkout.processing": "処理中...",
   "shop.checkout.confirm": "注文確定 ({n} CTP)",
   "shop.checkout.cancel": "キャンセル",
+  "shop.checkout.paymentMethod": "お支払い方法",
+  "shop.checkout.payWithPoints": "ポイントで支払う",
+  "shop.checkout.payByCard": "カードで支払う",
+  "shop.checkout.payByCardAmount": "{amount} を支払う",
+  "shop.checkout.cardUnavailable": "カード決済不可",
 
   // ── Share Social / Canvas extras ──
   "share.socialSingle": "🎉 Card Trainで{rarity}レアリティの「{prize}」を当てました！みんなも挑戦してみて！ #CardTrain #TCG #抽選",

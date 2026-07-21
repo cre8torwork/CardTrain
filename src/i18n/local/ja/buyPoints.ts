@@ -59,6 +59,16 @@ const translation = {
   "buyPoints.orderSummaryDesc": "購入内容をご確認ください",
   "buyPoints.payWithGlobalPayments": "Global Paymentsで安全に支払う",
   "buyPoints.redirectNote": "Global Paymentsの安全な支払いページに移動します",
+  "buyPoints.proceedToCard": "カードで支払う",
+  "buyPoints.preparingPayment": "安全な決済を準備中…",
+  "buyPoints.cardNumber": "カード番号",
+  "buyPoints.cardMonth": "月",
+  "buyPoints.cardYear": "年",
+  "buyPoints.cardCvn": "セキュリティコード",
+  "buyPoints.payAmount": "{amount} を支払う",
+  "buyPoints.securedByCybersource": "CyberSource による保護 · 3-D セキュア",
+  "buyPoints.cardUnsupported": "Visa と Mastercard のみご利用いただけます。",
+  "buyPoints.cardIncomplete": "有効期限とセキュリティコードを正しく入力してください。",
 };
 
 export default translation;

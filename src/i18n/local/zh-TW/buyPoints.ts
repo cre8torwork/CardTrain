@@ -74,6 +74,16 @@ const translation = {
   "buyPoints.orderSummaryDesc": "請確認以下購買資訊",
   "buyPoints.payWithGlobalPayments": "前往 Global Payments 安全付款",
   "buyPoints.redirectNote": "點擊後將導向 Global Payments 安全付款頁面",
+  "buyPoints.proceedToCard": "使用信用卡付款",
+  "buyPoints.preparingPayment": "正在準備安全付款…",
+  "buyPoints.cardNumber": "卡號",
+  "buyPoints.cardMonth": "月",
+  "buyPoints.cardYear": "年",
+  "buyPoints.cardCvn": "安全碼",
+  "buyPoints.payAmount": "支付 {amount}",
+  "buyPoints.securedByCybersource": "由 CyberSource 保護 · 3-D Secure",
+  "buyPoints.cardUnsupported": "僅接受 Visa 和 Mastercard。",
+  "buyPoints.cardIncomplete": "請輸入有效的有效期限與安全碼。",
 };
 
 export default translation;

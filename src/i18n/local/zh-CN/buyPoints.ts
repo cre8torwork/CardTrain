@@ -59,6 +59,16 @@ const translation = {
   "buyPoints.orderSummaryDesc": "请确认以下购买信息",
   "buyPoints.payWithGlobalPayments": "前往 Global Payments 安全付款",
   "buyPoints.redirectNote": "点击后将导向 Global Payments 安全付款页面",
+  "buyPoints.proceedToCard": "使用信用卡支付",
+  "buyPoints.preparingPayment": "正在准备安全支付…",
+  "buyPoints.cardNumber": "卡号",
+  "buyPoints.cardMonth": "月",
+  "buyPoints.cardYear": "年",
+  "buyPoints.cardCvn": "安全码",
+  "buyPoints.payAmount": "支付 {amount}",
+  "buyPoints.securedByCybersource": "由 CyberSource 保护 · 3-D Secure",
+  "buyPoints.cardUnsupported": "仅接受 Visa 和 Mastercard。",
+  "buyPoints.cardIncomplete": "请输入有效的有效期和安全码。",
 };
 
 export default translation;
