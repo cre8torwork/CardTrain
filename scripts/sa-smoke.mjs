@@ -17,6 +17,8 @@ const SECRET_KEY = process.env.CYBS_SA_SECRET_KEY;
 const ENDPOINT = process.env.CYBS_SA_ENDPOINT || 'https://testsecureacceptance.cybersource.com/silent/pay';
 const AMOUNT = process.env.SA_AMOUNT || '10.00';
 const CARD = process.env.SA_CARD || '4000000000002503'; // GPAP Visa test card (X->0)
+const CARD_TYPE = process.env.SA_CARD_TYPE || '001'; // 001 Visa, 002 Mastercard
+const TXN_TYPE = process.env.SA_TXN_TYPE || 'sale'; // sale | authorization
 
 if (!ACCESS_KEY || !SECRET_KEY) {
   console.error('Missing CYBS_SA_ACCESS_KEY / CYBS_SA_SECRET_KEY');
@@ -36,7 +38,7 @@ const fields = await buildSignedRequestFields(
     transactionUuid: crypto.randomUUID(),
     signedDateTime,
     locale: 'en',
-    transactionType: 'sale',
+    transactionType: TXN_TYPE,
     referenceNumber,
     amount: AMOUNT,
     currency: 'HKD',
@@ -48,7 +50,7 @@ const fields = await buildSignedRequestFields(
 
 const body = new URLSearchParams({
   ...fields,
-  card_type: '001',
+  card_type: CARD_TYPE,
   card_number: CARD,
   card_expiry_date: '12-2030',
   card_cvn: '123',
@@ -78,6 +80,7 @@ for (const tag of text.match(/<input[^>]*>/g) || []) {
 }
 
 console.log(`\ndecision=${resp.decision} reason_code=${resp.reason_code} message=${resp.message ?? ''}`);
+console.log(`req_profile_id=${resp.req_profile_id ?? ''} invalid_fields=${resp.invalid_fields ?? '(none)'} auth_avail=${resp.auth_response ?? ''}`);
 if (resp.signature && resp.signed_field_names) {
   const ok = await verifyResponseSignature(resp, SECRET_KEY);
   console.log(`response signature verifies with our secret: ${ok ? '✅ YES' : '❌ NO'}`);
