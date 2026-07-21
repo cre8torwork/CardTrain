@@ -3,8 +3,18 @@ import { validateApplePayMerchant, submitApplePay } from '../../lib/checkout';
 
 // Apple Pay via CyberSource. Front-end is complete; two server calls are pending
 // certificates: merchant validation (Merchant Identity cert) and token submission
-// (Simple Order, paymentSolution 001, MID gphk088034609202, P12). The button only
-// appears in Safari on a device with a provisioned card.
+// (Simple Order, paymentSolution 001, MID gphk088034609202, P12).
+//
+// Availability is FEATURE-DETECTED, never browser-sniffed — Apple Pay on the web is
+// NOT Safari-only. Since iOS 16 it works in third-party browsers on iOS/iPadOS
+// (Chrome, Edge, Firefox — all iOS browsers use WebKit), and Apple has since
+// extended it to desktop third-party browsers too. Feature detection means this
+// button lights up wherever Apple Pay is genuinely usable, without us maintaining
+// a browser list.
+//
+// It requires a SECURE CONTEXT: `ApplePaySession` is not exposed over plain http,
+// so the button will not appear on the http:// dev server even on a supported
+// device. Test over HTTPS (deploy or a tunnel).
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare global { interface Window { ApplePaySession?: any } }
