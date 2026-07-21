@@ -24,8 +24,23 @@ const escapeHtml = (s: string) =>
 
 // The confirmation page GPAP screenshots: status + the exact message + the
 // reference number. No sensitive wording ever (guaranteed by confirmationFor).
-function confirmationPage(category: string, message: string): string {
+function confirmationPage(category: string, message: string, referenceNumber = ""): string {
   const ok = category === "success";
+  // When loaded inside the site's payment iframe, hand the verified outcome up to
+  // the app so it can render its own confirmation — the customer never leaves the
+  // site. The visible markup below is the fallback when opened at top level.
+  const bridge = `<script>
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(JSON.stringify({
+          source: "cardtrain-payment",
+          category: ${JSON.stringify(category)},
+          message: ${JSON.stringify(message)},
+          referenceNumber: ${JSON.stringify(referenceNumber)}
+        }), ${JSON.stringify(SITE_URL)});
+      }
+    } catch (e) {}
+  </script>`;
   const accent = ok ? "#059669" : "#dc2626";
   const icon = ok ? "&#10003;" : "&#33;";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -48,7 +63,7 @@ function confirmationPage(category: string, message: string): string {
   <h1>${ok ? "Payment Successful" : "Payment Not Completed"}</h1>
   <p>${escapeHtml(message)}</p>
   <a href="${escapeHtml(SITE_URL)}">Return to Card Train</a>
-</div></body></html>`;
+</div>${bridge}</body></html>`;
 }
 
 const htmlResponse = (body: string, status: number) =>
@@ -141,7 +156,10 @@ serve(async (req: Request) => {
       }
     }
 
-    return htmlResponse(confirmationPage(confirmation.category, confirmation.message), 200);
+    return htmlResponse(
+      confirmationPage(confirmation.category, confirmation.message, referenceNumber),
+      200,
+    );
   } catch (_e) {
     return htmlResponse(
       confirmationPage("retry", "Transaction unsuccessful, please try again..."),

@@ -4,6 +4,10 @@ import { detectCardType, type SignedCheckout } from '../../lib/checkout';
 
 interface CardPaymentFormProps extends SignedCheckout {
   amountLabel: string; // e.g. "HK$ 300"
+  /** Name of the iframe to post into, so the top-level page never navigates away. */
+  target?: string;
+  /** Called once validation passes and the native cross-origin POST is about to fire. */
+  onSubmitted?: () => void;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -16,7 +20,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0
  * so card data never touches our servers. On submit the browser leaves for
  * CyberSource, which returns to our checkout-response receipt endpoint.
  */
-export default function CardPaymentForm({ endpoint, fields, amountLabel }: CardPaymentFormProps) {
+export default function CardPaymentForm({ endpoint, fields, amountLabel, target, onSubmitted }: CardPaymentFormProps) {
   const { t } = useTranslation();
   const [number, setNumber] = useState('');
   const [month, setMonth] = useState('');
@@ -38,13 +42,14 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel }: CardP
       setError(t('buyPoints.cardIncomplete'));
       return;
     }
-    // Otherwise allow the native cross-origin POST to CyberSource.
+    // Otherwise allow the native cross-origin POST to CyberSource (into `target`).
+    onSubmitted?.();
   };
 
   const input = 'w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent';
 
   return (
-    <form method="POST" action={endpoint} onSubmit={handleSubmit} className="space-y-3 text-left">
+    <form method="POST" action={endpoint} target={target} onSubmit={handleSubmit} className="space-y-3 text-left">
       {Object.entries(fields).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}

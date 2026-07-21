@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/hooks/useShopStore';
 import { placeShopOrder } from '@/hooks/useShopStore';
-import CardPaymentForm from '@/components/feature/CardPaymentForm';
+import CardPaymentFrame, { type PaymentOutcome } from '@/components/feature/CardPaymentFrame';
 import { createShopCardOrder, signCheckout, type SignedCheckout } from '@/lib/checkout';
 
 interface ShopCheckoutModalProps {
@@ -55,6 +55,7 @@ export default function ShopCheckoutModal({
   const [paymentMethod, setPaymentMethod] = useState<'points' | 'card'>('points');
   const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
+  const [outcome, setOutcome] = useState<PaymentOutcome | null>(null);
 
   const cardAvailable = cartItems.every((i) => i.product.hkdPriceMinor != null);
   const hkdTotalMinor = cartItems.reduce((s, i) => s + (i.product.hkdPriceMinor ?? 0) * i.quantity, 0);
@@ -289,8 +290,19 @@ export default function ShopCheckoutModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100">
-          {paymentMethod === 'card' && checkout ? (
-            <CardPaymentForm endpoint={checkout.endpoint} fields={checkout.fields} amountLabel={hkdTotalLabel} />
+          {outcome ? (
+            <div className="text-center py-2">
+              <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${outcome.category === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                <i className={`text-2xl ${outcome.category === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'}`}></i>
+              </div>
+              <p className="text-sm text-gray-700 leading-relaxed">{outcome.message}</p>
+              <button onClick={() => { if (outcome.category === 'success') onSuccess(); else onClose(); }}
+                className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm cursor-pointer">
+                {t('shop.checkout.cancel')}
+              </button>
+            </div>
+          ) : paymentMethod === 'card' && checkout ? (
+            <CardPaymentFrame endpoint={checkout.endpoint} fields={checkout.fields} amountLabel={hkdTotalLabel} onOutcome={setOutcome} />
           ) : (
             <div className="flex gap-3">
               <button

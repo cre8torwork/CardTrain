@@ -5,7 +5,7 @@ import { useUserAuth } from '../../hooks/useUserAuth';
 import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
-import CardPaymentForm from '../../components/feature/CardPaymentForm';
+import CardPaymentFrame, { type PaymentOutcome } from '../../components/feature/CardPaymentFrame';
 import GooglePayButton from '../../components/feature/GooglePayButton';
 import ApplePayButton from '../../components/feature/ApplePayButton';
 import { createBuyPointsOrder, signCheckout, type SignedCheckout } from '../../lib/checkout';
@@ -50,6 +50,7 @@ export default function BuyPointsPage() {
   const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [outcome, setOutcome] = useState<PaymentOutcome | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -94,6 +95,7 @@ export default function BuyPointsPage() {
     if (!selectedPackage) return;
     setCheckout(null);
     setCheckoutError('');
+    setOutcome(null);
     setShowPaymentModal(true);
   };
 
@@ -467,11 +469,25 @@ export default function BuyPointsPage() {
               </div>
             </div>
 
-            {checkout ? (
-              <CardPaymentForm
+            {outcome ? (
+              <div className="text-center py-2">
+                <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${outcome.category === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                  <i className={`text-2xl ${outcome.category === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'}`}></i>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed">{outcome.message}</p>
+                <button
+                  onClick={() => { setShowPaymentModal(false); if (outcome.category === 'success') navigate('/user'); }}
+                  className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm cursor-pointer"
+                >
+                  {outcome.category === 'success' ? t('buyPoints.goToUser') : t('common.cancel')}
+                </button>
+              </div>
+            ) : checkout ? (
+              <CardPaymentFrame
                 endpoint={checkout.endpoint}
                 fields={checkout.fields}
                 amountLabel={`HK$ ${totalHKD.toLocaleString()}`}
+                onOutcome={setOutcome}
               />
             ) : (
               <>
