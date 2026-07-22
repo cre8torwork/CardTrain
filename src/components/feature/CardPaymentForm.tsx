@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { detectCardType, type SignedCheckout } from '../../lib/checkout';
+import SecureBadges from './SecureBadges';
 
 interface CardPaymentFormProps extends SignedCheckout {
   amountLabel: string; // e.g. "HK$ 300"
@@ -104,6 +105,9 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
           <i className="ri-error-warning-line flex-shrink-0"></i>{error}
         </div>
       )}
+
+      {/* 3-D Secure programme marks, close to the CHECKOUT button (GPAP requirement) */}
+      <SecureBadges className="pt-1" />
 
       <button
         type="submit"
