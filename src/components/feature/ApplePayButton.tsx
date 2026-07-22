@@ -27,14 +27,30 @@ interface ApplePayButtonProps {
 
 export default function ApplePayButton({ amountMinor, createOrder, onResult }: ApplePayButtonProps) {
   const [available, setAvailable] = useState(false);
+  const [diag, setDiag] = useState('');
 
   useEffect(() => {
+    let ok = false;
+    let reason: string;
     try {
-      setAvailable(!!window.ApplePaySession && window.ApplePaySession.canMakePayments());
-    } catch {
-      setAvailable(false);
+      if (typeof window.ApplePaySession === 'undefined') {
+        reason = 'ApplePaySession undefined — this browser/OS does not expose Apple Pay JS (or the page is not a secure context)';
+      } else if (!window.ApplePaySession.canMakePayments()) {
+        reason = 'ApplePaySession present but canMakePayments() = false — device cannot pay with Apple Pay';
+      } else {
+        ok = true;
+        reason = 'available';
+      }
+    } catch (e) {
+      reason = `detection threw: ${e instanceof Error ? e.message : String(e)}`;
     }
+    setAvailable(ok);
+    setDiag(`secureContext=${window.isSecureContext} · ${reason}`);
   }, []);
+
+  // Append ?paydebug=1 to the URL to see why the button is hidden on a device.
+  const debug =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('paydebug');
 
   const handleClick = async () => {
     const AP = window.ApplePaySession;
@@ -77,7 +93,11 @@ export default function ApplePayButton({ amountMinor, createOrder, onResult }: A
     session.begin();
   };
 
-  if (!available) return null;
+  if (!available) {
+    return debug ? (
+      <p className="text-[11px] leading-snug text-gray-400 break-words">Apple Pay hidden — {diag}</p>
+    ) : null;
+  }
 
   return (
     <button
