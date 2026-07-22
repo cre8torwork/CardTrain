@@ -5,7 +5,7 @@ import { useUserAuth } from '../../hooks/useUserAuth';
 import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
-import { createBuyPointsOrder, signCheckout } from '../../lib/checkout';
+import { createBuyPointsOrder, createCustomPointsOrder, signCheckout } from '../../lib/checkout';
 
 interface PointsPackage {
   id: string;
@@ -41,6 +41,8 @@ export default function BuyPointsPage() {
 
   const [selectedPackage, setSelectedPackage] = useState<PointsPackage | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [isCustom, setIsCustom] = useState(false);
+  const [customCtp, setCustomCtp] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<number | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -66,29 +68,50 @@ export default function BuyPointsPage() {
 
   const handleSelectPackage = (pkg: PointsPackage) => {
     setSelectedPackage(pkg);
+    setIsCustom(false);
     setQuantity(1);
   };
+
+  const handleSelectCustom = () => {
+    setSelectedPackage(null);
+    setIsCustom(true);
+    setQuantity(1);
+    if (!customCtp) setCustomCtp('');
+  };
+
+  const parsedCustomCtp = parseInt(customCtp, 10);
+  const customCtpValid = isCustom && Number.isInteger(parsedCustomCtp) && parsedCustomCtp >= 50 && parsedCustomCtp % 10 === 0;
 
   const handleProceedPayment = () => {
     if (!isLoggedIn) {
       navigate('/login');
       return;
     }
-    if (!selectedPackage) return;
+    if (!selectedPackage && !customCtpValid) return;
     setCheckoutError('');
     setShowPaymentModal(true);
   };
 
-  const totalCTP = selectedPackage ? selectedPackage.ctp * quantity : 0;
-  const totalHKD = selectedPackage ? selectedPackage.hkd * quantity : 0;
+  const totalCTP = isCustom && customCtpValid ? parsedCustomCtp : selectedPackage ? selectedPackage.ctp * quantity : 0;
+  const totalHKD = isCustom && customCtpValid ? parsedCustomCtp / 10 : selectedPackage ? selectedPackage.hkd * quantity : 0;
 
   // Create + sign the order, then hand off to the in-site /checkout page.
   const handlePayNow = async () => {
-    if (!selectedPackage) return;
+    if (!selectedPackage && !customCtpValid) return;
     setCheckoutLoading(true);
     setCheckoutError('');
     try {
-      const orderId = await createBuyPointsOrder(selectedPackage.id, quantity);
+      let orderId: string;
+      let packageLabel: string;
+      if (isCustom && customCtpValid) {
+        orderId = await createCustomPointsOrder(parsedCustomCtp);
+        packageLabel = `${parsedCustomCtp.toLocaleString()} CTP`;
+      } else if (selectedPackage) {
+        orderId = await createBuyPointsOrder(selectedPackage.id, quantity);
+        packageLabel = `${selectedPackage.ctp.toLocaleString()} CTP`;
+      } else {
+        throw new Error('No selection');
+      }
       const signed = await signCheckout(orderId);
       navigate('/checkout', {
         state: {
@@ -97,8 +120,8 @@ export default function BuyPointsPage() {
           amountMinor: totalHKD * 100,
           amountLabel: `HK$ ${totalHKD.toLocaleString()}`,
           lines: [
-            { label: t('buyPoints.packageLabel'), value: `${selectedPackage.ctp.toLocaleString()} CTP` },
-            { label: t('buyPoints.quantityLabel'), value: String(quantity) },
+            { label: t('buyPoints.packageLabel'), value: packageLabel },
+            { label: t('buyPoints.quantityLabel'), value: isCustom ? '1' : String(quantity) },
             { label: t('buyPoints.totalReceive'), value: `${totalCTP.toLocaleString()} CTP` },
           ],
           successTo: '/user',
@@ -270,30 +293,105 @@ export default function BuyPointsPage() {
               </div>
             );
           })}
+
+          {/* Custom Amount Card */}
+          <div
+            onClick={handleSelectCustom}
+            className={`relative rounded-2xl border-2 p-5 cursor-pointer transition-all duration-300 ${
+              isCustom
+                ? 'border-rose-500 bg-rose-50/50 shadow-lg shadow-rose-100 scale-[1.02]'
+                : 'border-dashed border-gray-300 bg-white hover:border-rose-300 hover:shadow-md'
+            }`}
+          >
+            <div className="text-center">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2 ${isCustom ? 'bg-rose-100 text-rose-500' : 'bg-gray-100 text-gray-400'}`}>
+                <i className="ri-edit-line text-xl"></i>
+              </div>
+              <p className="font-bold text-gray-800 text-sm">{t('buyPoints.customAmount')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('buyPoints.customAmountDesc')}</p>
+            </div>
+
+            {isCustom && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t('buyPoints.enterCtp')}</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={customCtp}
+                      onChange={(e) => setCustomCtp(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder={t('buyPoints.ctpPlaceholder')}
+                      step="10"
+                      min="50"
+                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">CTP</span>
+                  </div>
+                </div>
+                {customCtp && !customCtpValid && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <i className="ri-information-line"></i>
+                    {t('buyPoints.ctpHint')}
+                  </p>
+                )}
+                {customCtpValid && (
+                  <div className="bg-rose-50 rounded-xl px-3 py-2.5 flex items-center justify-between">
+                    <span className="text-xs text-gray-500">{t('buyPoints.totalAmount')}</span>
+                    <span className="text-lg font-black text-gray-900">HK$ {(parsedCustomCtp / 10).toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              className={`mt-4 w-full py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                isCustom
+                  ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md'
+                  : 'bg-gray-50 text-gray-600 hover:bg-rose-50 hover:text-rose-500 border border-gray-100'
+              }`}
+            >
+              {isCustom ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <i className="ri-checkbox-circle-fill"></i>{t('buyPoints.selected')}
+                </span>
+              ) : (
+                t('buyPoints.select')
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Bottom CTA */}
         <div className="mt-8 text-center space-y-3">
-          {selectedPackage && (
+          {(selectedPackage || (isCustom && customCtpValid)) && (
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
-              <span>{selectedPackage.ctp.toLocaleString()} CTP × {quantity}</span>
-              <span className="text-gray-300">|</span>
-              <span className="font-semibold text-gray-700">
-                {t('buyPoints.subtotal', { hkd: totalHKD.toLocaleString(), ctp: totalCTP.toLocaleString() })}
-              </span>
+              {isCustom && customCtpValid ? (
+                <span className="font-semibold text-gray-700">
+                  {parsedCustomCtp.toLocaleString()} CTP &mdash; HK$ {(parsedCustomCtp / 10).toLocaleString()}
+                </span>
+              ) : selectedPackage ? (
+                <>
+                  <span>{selectedPackage.ctp.toLocaleString()} CTP × {quantity}</span>
+                  <span className="text-gray-300">|</span>
+                  <span className="font-semibold text-gray-700">
+                    {t('buyPoints.subtotal', { hkd: totalHKD.toLocaleString(), ctp: totalCTP.toLocaleString() })}
+                  </span>
+                </>
+              ) : null}
             </div>
           )}
           <button
             onClick={handleProceedPayment}
-            disabled={!selectedPackage}
+            disabled={!selectedPackage && !customCtpValid}
             className={`inline-flex items-center gap-2 px-10 py-4 rounded-2xl font-bold text-lg whitespace-nowrap transition-all shadow-lg ${
-              selectedPackage
+              (selectedPackage || customCtpValid)
                 ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white hover:from-rose-600 hover:to-pink-600 hover:shadow-xl active:scale-95 cursor-pointer'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
             }`}
           >
             <i className="ri-bank-card-line text-xl"></i>
-            {selectedPackage
+            {(selectedPackage || customCtpValid)
               ? t('buyPoints.payNow', { hkd: totalHKD.toLocaleString(), ctp: totalCTP.toLocaleString() })
               : t('buyPoints.selectPackageFirst')}
           </button>
@@ -419,7 +517,7 @@ export default function BuyPointsPage() {
       </section>
 
       {/* Payment Modal */}
-      {showPaymentModal && selectedPackage && (
+      {showPaymentModal && (selectedPackage || customCtpValid) && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowPaymentModal(false)}>
           <div
             className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative animate-[fadeInUp_0.3s_ease-out]"
@@ -443,11 +541,11 @@ export default function BuyPointsPage() {
             <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">{t('buyPoints.packageLabel')}</span>
-                <span className="font-semibold text-gray-800">{selectedPackage.ctp.toLocaleString()} CTP</span>
+                <span className="font-semibold text-gray-800">{isCustom ? `${parsedCustomCtp.toLocaleString()} CTP` : selectedPackage?.ctp.toLocaleString()} CTP</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">{t('buyPoints.quantityLabel')}</span>
-                <span className="font-semibold text-gray-800">{quantity}</span>
+                <span className="font-semibold text-gray-800">{isCustom ? '1' : quantity}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 flex justify-between text-sm">
                 <span className="text-gray-500">{t('buyPoints.totalReceive')}</span>

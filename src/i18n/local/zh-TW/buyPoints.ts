@@ -84,6 +84,12 @@ const translation = {
   "buyPoints.securedByCybersource": "由 CyberSource 保護 · 3-D Secure",
   "buyPoints.cardUnsupported": "僅接受 Visa 和 Mastercard。",
   "buyPoints.cardIncomplete": "請輸入有效的有效期限與安全碼。",
+  "buyPoints.customAmount": "自订金额",
+  "buyPoints.customAmountDesc": "直接输入您需要的 CTP 数量",
+  "buyPoints.enterCtp": "输入 CTP 数量",
+  "buyPoints.ctpPlaceholder": "例如 750",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 最低 50 CTP &middot; 须为 10 的倍数",
+  "buyPoints.customCtpLabel": "自订 CTP",
 };
 
 export default translation;

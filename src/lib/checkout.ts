@@ -16,6 +16,17 @@ export async function createBuyPointsOrder(packageId: string, quantity: number):
   return orderId;
 }
 
+/** Create a custom-points order where the user types the CTP directly. */
+export async function createCustomPointsOrder(ctp: number): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('create-order', {
+    body: { kind: 'buy_points_custom', ctp },
+  });
+  if (error) throw error;
+  const orderId = (data as { orderId?: string })?.orderId;
+  if (!orderId) throw new Error((data as { error?: string })?.error || 'Failed to create order');
+  return orderId;
+}
+
 export interface ShopShipping {
   recipientName: string;
   phone: string;

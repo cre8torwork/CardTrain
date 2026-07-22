@@ -69,6 +69,12 @@ const translation = {
   "buyPoints.securedByCybersource": "Secured by CyberSource · 3-D Secure",
   "buyPoints.cardUnsupported": "Only Visa and Mastercard are accepted.",
   "buyPoints.cardIncomplete": "Please enter a valid expiry date and CVV.",
+  "buyPoints.customAmount": "Custom Amount",
+  "buyPoints.customAmountDesc": "Type exactly how many CTP you want",
+  "buyPoints.enterCtp": "Enter CTP amount",
+  "buyPoints.ctpPlaceholder": "e.g. 750",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; Min 50 CTP &middot; Multiples of 10 only",
+  "buyPoints.customCtpLabel": "Custom CTP",
 };
 
 export default translation;

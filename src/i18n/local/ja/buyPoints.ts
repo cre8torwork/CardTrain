@@ -69,6 +69,12 @@ const translation = {
   "buyPoints.securedByCybersource": "CyberSource による保護 · 3-D セキュア",
   "buyPoints.cardUnsupported": "Visa と Mastercard のみご利用いただけます。",
   "buyPoints.cardIncomplete": "有効期限とセキュリティコードを正しく入力してください。",
+  "buyPoints.customAmount": "カスタム金額",
+  "buyPoints.customAmountDesc": "必要なCTP数を直接入力",
+  "buyPoints.enterCtp": "CTP数を入力",
+  "buyPoints.ctpPlaceholder": "例: 750",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 最低 50 CTP &middot; 10の倍数のみ",
+  "buyPoints.customCtpLabel": "カスタム CTP",
 };
 
 export default translation;
