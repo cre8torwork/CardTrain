@@ -8,6 +8,9 @@ dist
 # generated
 auto-imports.d.ts
 
+# supabase cli scratch state
+supabase/.temp
+
 # os / editor
 .DS_Store
 *.local
