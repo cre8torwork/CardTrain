@@ -81,6 +81,8 @@ for (const tag of text.match(/<input[^>]*>/g) || []) {
 
 console.log(`\ndecision=${resp.decision} reason_code=${resp.reason_code} message=${resp.message ?? ''}`);
 console.log(`req_profile_id=${resp.req_profile_id ?? ''} invalid_fields=${resp.invalid_fields ?? '(none)'} auth_avail=${resp.auth_response ?? ''}`);
+// Where CyberSource sends its response — must be our checkout-response endpoint.
+console.log(`response form action = ${text.match(/<form[^>]*action="([^"]+)"/)?.[1] ?? '(none)'}`);
 if (resp.signature && resp.signed_field_names) {
   const ok = await verifyResponseSignature(resp, SECRET_KEY);
   console.log(`response signature verifies with our secret: ${ok ? '✅ YES' : '❌ NO'}`);

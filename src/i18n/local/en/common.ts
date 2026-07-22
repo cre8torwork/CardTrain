@@ -1034,6 +1034,7 @@ const translation = {
   "shop.checkout.confirm": "Confirm Order ({n} CTP)",
   "shop.checkout.cancel": "Cancel",
   "checkout.title": "Secure Checkout",
+  "checkout.timeout": "Payment is taking longer than expected. Please check your points balance before retrying, or contact support.",
   "checkout.back": "Back",
   "checkout.missing": "No pending payment found. Please start your purchase again.",
   "checkout.onSiteNote": "Card details are entered and processed securely on this page — you are never redirected off Card Train.",

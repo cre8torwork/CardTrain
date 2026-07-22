@@ -1034,6 +1034,7 @@ const translation = {
   "shop.checkout.confirm": "注文確定 ({n} CTP)",
   "shop.checkout.cancel": "キャンセル",
   "checkout.title": "安全なお支払い",
+  "checkout.timeout": "お支払いの確認に時間がかかっています。再試行の前にポイント残高をご確認いただくか、サポートへご連絡ください。",
   "checkout.back": "戻る",
   "checkout.missing": "処理中のお支払いが見つかりません。もう一度購入手続きを行ってください。",
   "checkout.onSiteNote": "カード情報はこのページ内で安全に処理されます。外部サイトへ移動することはありません。",

@@ -47,9 +47,21 @@ export default function CardPaymentFrame({ endpoint, fields, amountLabel, onOutc
     return () => window.removeEventListener('message', onMessage);
   }, [onOutcome]);
 
+  // Safety net: never spin forever if the result message never arrives.
+  useEffect(() => {
+    if (!processing) return;
+    const timer = setTimeout(() => {
+      onOutcome({ category: 'retry', message: t('checkout.timeout'), referenceNumber: '' });
+    }, 180_000);
+    return () => clearTimeout(timer);
+  }, [processing, onOutcome, t]);
+
   return (
     <div className="space-y-3">
-      {!processing && (
+      {/* The form must stay MOUNTED across submit: unmounting it detaches the
+          <form> before the browser performs the native POST, which silently
+          cancels the submission. Hide it visually instead. */}
+      <div className={processing ? 'hidden' : ''}>
         <CardPaymentForm
           endpoint={endpoint}
           fields={fields}
@@ -57,7 +69,7 @@ export default function CardPaymentFrame({ endpoint, fields, amountLabel, onOutc
           target={FRAME_NAME}
           onSubmitted={() => setProcessing(true)}
         />
-      )}
+      </div>
 
       {processing && (
         <p className="flex items-center justify-center gap-2 text-sm text-gray-500 py-2">

@@ -1034,6 +1034,7 @@ const translation = {
   "shop.checkout.confirm": "确认下单 ({n} CTP)",
   "shop.checkout.cancel": "取消",
   "checkout.title": "安全支付",
+  "checkout.timeout": "支付确认时间过长。请先查看您的积分余额再重试，或联系客服。",
   "checkout.back": "返回",
   "checkout.missing": "未找到待支付的订单，请重新开始购买。",
   "checkout.onSiteNote": "卡片信息在本页面内安全处理，不会跳转到 Card Train 以外的网站。",
