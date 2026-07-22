@@ -30,22 +30,46 @@ export default function ApplePayButton({ amountMinor, createOrder, onResult }: A
   const [diag, setDiag] = useState('');
 
   useEffect(() => {
-    let ok = false;
-    let reason: string;
-    try {
-      if (typeof window.ApplePaySession === 'undefined') {
-        reason = 'ApplePaySession undefined — this browser/OS does not expose Apple Pay JS (or the page is not a secure context)';
-      } else if (!window.ApplePaySession.canMakePayments()) {
-        reason = 'ApplePaySession present but canMakePayments() = false — device cannot pay with Apple Pay';
-      } else {
-        ok = true;
-        reason = 'available';
+    let cancelled = false;
+
+    const detect = async (): Promise<{ ok: boolean; reason: string }> => {
+      const AP = window.ApplePaySession;
+      if (typeof AP === 'undefined') {
+        return { ok: false, reason: 'ApplePaySession undefined — Apple Pay JS SDK not loaded yet (or blocked)' };
       }
-    } catch (e) {
-      reason = `detection threw: ${e instanceof Error ? e.message : String(e)}`;
-    }
-    setAvailable(ok);
-    setDiag(`secureContext=${window.isSecureContext} · ${reason}`);
+      try {
+        // Third-party browsers (SDK): applePayCapabilities() is the supported check.
+        if (typeof AP.applePayCapabilities === 'function') {
+          const caps = await AP.applePayCapabilities();
+          const status = caps?.paymentCredentialStatus ?? 'unknown';
+          // Apple guidance: show the button unless the platform reports unsupported.
+          return status === 'applePayUnsupported'
+            ? { ok: false, reason: `applePayCapabilities → ${status}` }
+            : { ok: true, reason: `applePayCapabilities → ${status}` };
+        }
+        // Native WebKit fallback.
+        return AP.canMakePayments()
+          ? { ok: true, reason: 'canMakePayments() = true' }
+          : { ok: false, reason: 'canMakePayments() = false — no card provisioned on this device' };
+      } catch (e) {
+        return { ok: false, reason: `detection threw: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    };
+
+    // The SDK script loads async, so poll briefly instead of checking once at mount.
+    let tries = 0;
+    const attempt = async () => {
+      const { ok, reason } = await detect();
+      if (cancelled) return;
+      setAvailable(ok);
+      setDiag(`secureContext=${window.isSecureContext} · ${reason}`);
+      if (!ok && typeof window.ApplePaySession === 'undefined' && ++tries < 20) {
+        setTimeout(attempt, 250);
+      }
+    };
+    attempt();
+
+    return () => { cancelled = true; };
   }, []);
 
   // Append ?paydebug=1 to the URL to see why the button is hidden on a device.
