@@ -7,14 +7,50 @@ the API calls — this is an approval gate run by people, not an internal QA pas
 
 Background: the design spec (`2026-07-15-cardtrain-cybersource-design.md`).
 
+## ✅ API-level dry run — all 6 pass (2026-07-23)
+
+Ran headless via `scripts/sa-matrix.mjs` against the test endpoint with the real
+credentials, **after the profile was promoted** (the fix — disabling payer auth
+only takes effect once the profile is *promoted* to active). Every case returned
+its expected reason code, the response signature verified, and our mapper rendered
+the correct neutral cardholder message:
+
+| Case | Card | Amount | Reason | Decision | Reference # |
+|---|---|---|---|---|---|
+| 1 | Visa | 10 | **100** | ACCEPT | `CTMRWPWDHJ447` |
+| 1 | Mastercard | 10 | **100** | ACCEPT | `CTMRWPWEED2799` |
+| 2 | Visa | 4091 | **150** | ERROR | `CTMRWPWEYD2450` |
+| 2 | Mastercard | 4091 | **150** | ERROR | `CTMRWPWGOS6235` |
+| 3 | Visa | 4051 | **204** | DECLINE | `CTMRWPWH9E8328` |
+| 3 | Mastercard | 4051 | **204** | DECLINE | `CTMRWPWHPD338` |
+
+Sensitive-wording rule proven: for Case 3 the gateway's own message is *"Not
+sufficient funds"*, but our confirmation page shows *"Transaction rejected, please
+contact your bank…"* instead.
+
+> This proves the gateway + our signing/mapping. It is **not** the GPAP deliverable
+> — GPAP wants **screenshots of the real checkout page** for each case. Re-run this
+> command any time: `CYBS_SA_* node scripts/sa-matrix.mjs` (creds via env, never
+> committed).
+
 ## Prerequisites (all must be true before starting)
 
-- [ ] Secure Acceptance **Profile ID / Access Key / Secret Key** installed in the
-      Supabase env (`CYBS_SA_*`), `CYBS_SA_ENDPOINT` = the **test** URL
-      (`https://testsecureacceptance.cybersource.com/silent/pay`).
-- [ ] The **profile is configured**: currency **HKD**; card types **Visa +
-      Mastercard**; **Check Payer Authentication** (3DS 2.0) enabled; Ignore AVS.
-- [ ] The checkout + confirmation page are deployed to a test host, with the 3DS
+- [x] Secure Acceptance **Profile ID / Access Key / Secret Key** set as Supabase
+      secrets (`CYBS_SA_*`), `CYBS_SA_ENDPOINT` = the **test** URL
+      (`https://testsecureacceptance.cybersource.com/silent/pay`). *(Done 2026-07-22.)*
+- [x] The **profile is configured**: currency **HKD**; card types **Visa +
+      Mastercard**; Ignore AVS. ⚠️ **Payer Authentication must be OFF for the
+      connectivity test** — the GPAP test cards are amount-driven, not 3DS-enrolled;
+      with payer auth on, all 6 return reason 102 before the amount is evaluated.
+      (3DS/payer auth is a *production* concern; re-enable it after the gate.)
+- [ ] **Customer Response Page** on the profile → the receipt endpoint
+      `https://cdsrzczbnbhlmiebxzfb.supabase.co/functions/v1/checkout-response`
+      (not the site homepage — else the browser flow hangs).
+- [ ] ⚠️ **PROMOTE the profile after ANY change.** Secure Acceptance edits land on
+      an *inactive* copy; live transactions use the *active* copy. Nothing takes
+      effect until you click **Promote**. (This was the single blocker that made all
+      6 cases fail with reason 102 despite payer auth being "disabled".)
+- [ ] The checkout + confirmation page are deployed (latest `main`), with the 3DS
       logos (Visa Secure, Mastercard Identity Check) near the CHECKOUT button.
 - [ ] Access to **EBC** (`https://ebctest.cybersource.com/ebctest/login/` — confirm
       with GPAP) to verify each result.
