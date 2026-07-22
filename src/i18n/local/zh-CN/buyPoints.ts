@@ -58,7 +58,7 @@ const translation = {
   "buyPoints.orderSummary": "订单摘要",
   "buyPoints.orderSummaryDesc": "请确认以下购买信息",
   "buyPoints.payWithGlobalPayments": "前往 Global Payments 安全付款",
-  "buyPoints.redirectNote": "点击后将导向 Global Payments 安全付款页面",
+  "buyPoints.redirectNote": "将进入本站的安全支付页面，不会跳转到外部网站",
   "buyPoints.proceedToCard": "使用信用卡支付",
   "buyPoints.preparingPayment": "正在准备安全支付…",
   "buyPoints.cardNumber": "卡号",

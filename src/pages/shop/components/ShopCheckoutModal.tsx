@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/hooks/useShopStore';
 import { placeShopOrder } from '@/hooks/useShopStore';
-import CardPaymentFrame, { type PaymentOutcome } from '@/components/feature/CardPaymentFrame';
-import { createShopCardOrder, signCheckout, type SignedCheckout } from '@/lib/checkout';
+import { createShopCardOrder, signCheckout } from '@/lib/checkout';
 
 interface ShopCheckoutModalProps {
   cartItems: CartItem[];
@@ -40,6 +40,7 @@ export default function ShopCheckoutModal({
   onSuccess,
 }: ShopCheckoutModalProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [form, setForm] = useState<ShippingForm>({
     recipientName: '',
     phone: '',
@@ -53,9 +54,7 @@ export default function ShopCheckoutModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'points' | 'card'>('points');
-  const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
   const [cardBusy, setCardBusy] = useState(false);
-  const [outcome, setOutcome] = useState<PaymentOutcome | null>(null);
 
   const cardAvailable = cartItems.every((i) => i.product.hkdPriceMinor != null);
   const hkdTotalMinor = cartItems.reduce((s, i) => s + (i.product.hkdPriceMinor ?? 0) * i.quantity, 0);
@@ -111,7 +110,20 @@ export default function ShopCheckoutModal({
         form,
       );
       const signed = await signCheckout(orderId);
-      setCheckout(signed);
+      // Hand off to the in-site /checkout page (card entry + 3DS happen there).
+      navigate('/checkout', {
+        state: {
+          orderId,
+          checkout: signed,
+          amountMinor: hkdTotalMinor,
+          amountLabel: hkdTotalLabel,
+          lines: cartItems.map((i) => ({
+            label: `${i.product.name} × ${i.quantity}`,
+            value: `HK$ ${(((i.product.hkdPriceMinor ?? 0) * i.quantity) / 100).toFixed(2)}`,
+          })),
+          successTo: '/user',
+        },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -180,7 +192,7 @@ export default function ShopCheckoutModal({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => { setPaymentMethod('points'); setCheckout(null); setError(''); }}
+                onClick={() => { setPaymentMethod('points'); setError(''); }}
                 className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${paymentMethod === 'points' ? 'border-rose-400 bg-rose-50 text-rose-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
               >
                 {t('shop.checkout.payWithPoints')}<br /><span className="text-xs font-normal">{totalPoints.toLocaleString()} CTP</span>
@@ -290,21 +302,7 @@ export default function ShopCheckoutModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100">
-          {outcome ? (
-            <div className="text-center py-2">
-              <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${outcome.category === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                <i className={`text-2xl ${outcome.category === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'}`}></i>
-              </div>
-              <p className="text-sm text-gray-700 leading-relaxed">{outcome.message}</p>
-              <button onClick={() => { if (outcome.category === 'success') onSuccess(); else onClose(); }}
-                className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm cursor-pointer">
-                {t('shop.checkout.cancel')}
-              </button>
-            </div>
-          ) : paymentMethod === 'card' && checkout ? (
-            <CardPaymentFrame endpoint={checkout.endpoint} fields={checkout.fields} amountLabel={hkdTotalLabel} onOutcome={setOutcome} />
-          ) : (
-            <div className="flex gap-3">
+          <div className="flex gap-3">
               <button
                 onClick={onClose}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
@@ -337,7 +335,6 @@ export default function ShopCheckoutModal({
                 </button>
               )}
             </div>
-          )}
         </div>
       </div>
     </div>

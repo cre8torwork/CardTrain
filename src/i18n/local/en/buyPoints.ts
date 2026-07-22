@@ -58,7 +58,7 @@ const translation = {
   "buyPoints.orderSummary": "Order Summary",
   "buyPoints.orderSummaryDesc": "Please confirm your purchase details",
   "buyPoints.payWithGlobalPayments": "Pay Securely via Global Payments",
-  "buyPoints.redirectNote": "You will be redirected to Global Payments secure payment page",
+  "buyPoints.redirectNote": "Continue to our secure on-site checkout — you will not be redirected to an external page",
   "buyPoints.proceedToCard": "Pay by Card",
   "buyPoints.preparingPayment": "Preparing secure payment…",
   "buyPoints.cardNumber": "Card Number",

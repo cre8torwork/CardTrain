@@ -1,14 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUserAuth } from '../../hooks/useUserAuth';
 import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
-import CardPaymentFrame, { type PaymentOutcome } from '../../components/feature/CardPaymentFrame';
-import GooglePayButton from '../../components/feature/GooglePayButton';
-import ApplePayButton from '../../components/feature/ApplePayButton';
-import { createBuyPointsOrder, signCheckout, type SignedCheckout } from '../../lib/checkout';
+import { createBuyPointsOrder, signCheckout } from '../../lib/checkout';
 
 interface PointsPackage {
   id: string;
@@ -47,29 +44,14 @@ export default function BuyPointsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<number | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [checkout, setCheckout] = useState<SignedCheckout | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
-  const [outcome, setOutcome] = useState<PaymentOutcome | null>(null);
 
   useEffect(() => {
     if (currentUser) {
       getPoints(currentUser.id).then(({ points }) => setCurrentPoints(points));
     }
   }, [currentUser, getPoints]);
-
-  // Hooks must run on every render — keep these above the loading early-return.
-  const gpayCreateOrder = useCallback(
-    () => createBuyPointsOrder(selectedPackage!.id, quantity),
-    [selectedPackage, quantity],
-  );
-  const handleGpayResult = useCallback(
-    (r: { ok: boolean; message: string }) => {
-      if (r.ok) { setShowPaymentModal(false); navigate('/user'); }
-      else setCheckoutError(r.message);
-    },
-    [navigate],
-  );
 
   if (loading) {
     return (
@@ -93,12 +75,14 @@ export default function BuyPointsPage() {
       return;
     }
     if (!selectedPackage) return;
-    setCheckout(null);
     setCheckoutError('');
-    setOutcome(null);
     setShowPaymentModal(true);
   };
 
+  const totalCTP = selectedPackage ? selectedPackage.ctp * quantity : 0;
+  const totalHKD = selectedPackage ? selectedPackage.hkd * quantity : 0;
+
+  // Create + sign the order, then hand off to the in-site /checkout page.
   const handlePayNow = async () => {
     if (!selectedPackage) return;
     setCheckoutLoading(true);
@@ -106,16 +90,26 @@ export default function BuyPointsPage() {
     try {
       const orderId = await createBuyPointsOrder(selectedPackage.id, quantity);
       const signed = await signCheckout(orderId);
-      setCheckout(signed);
+      navigate('/checkout', {
+        state: {
+          orderId,
+          checkout: signed,
+          amountMinor: totalHKD * 100,
+          amountLabel: `HK$ ${totalHKD.toLocaleString()}`,
+          lines: [
+            { label: t('buyPoints.packageLabel'), value: `${selectedPackage.ctp.toLocaleString()} CTP` },
+            { label: t('buyPoints.quantityLabel'), value: String(quantity) },
+            { label: t('buyPoints.totalReceive'), value: `${totalCTP.toLocaleString()} CTP` },
+          ],
+          successTo: '/user',
+        },
+      });
     } catch (e) {
       setCheckoutError(e instanceof Error ? e.message : String(e));
     } finally {
       setCheckoutLoading(false);
     }
   };
-
-  const totalCTP = selectedPackage ? selectedPackage.ctp * quantity : 0;
-  const totalHKD = selectedPackage ? selectedPackage.hkd * quantity : 0;
 
   return (
     <div className="min-h-screen bg-white">
@@ -469,65 +463,25 @@ export default function BuyPointsPage() {
               </div>
             </div>
 
-            {outcome ? (
-              <div className="text-center py-2">
-                <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${outcome.category === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                  <i className={`text-2xl ${outcome.category === 'success' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'}`}></i>
-                </div>
-                <p className="text-sm text-gray-700 leading-relaxed">{outcome.message}</p>
-                <button
-                  onClick={() => { setShowPaymentModal(false); if (outcome.category === 'success') navigate('/user'); }}
-                  className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-sm cursor-pointer"
-                >
-                  {outcome.category === 'success' ? t('buyPoints.goToUser') : t('common.cancel')}
-                </button>
+            <button
+              onClick={handlePayNow}
+              disabled={checkoutLoading}
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {checkoutLoading ? (
+                <><i className="ri-loader-4-line animate-spin"></i>{t('buyPoints.preparingPayment')}</>
+              ) : (
+                <><i className="ri-secure-payment-line text-lg"></i>{t('buyPoints.proceedToCard')}</>
+              )}
+            </button>
+
+            {checkoutError && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                <i className="ri-error-warning-line flex-shrink-0"></i>{checkoutError}
               </div>
-            ) : checkout ? (
-              <CardPaymentFrame
-                endpoint={checkout.endpoint}
-                fields={checkout.fields}
-                amountLabel={`HK$ ${totalHKD.toLocaleString()}`}
-                onOutcome={setOutcome}
-              />
-            ) : (
-              <>
-                <button
-                  onClick={handlePayNow}
-                  disabled={checkoutLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {checkoutLoading ? (
-                    <><i className="ri-loader-4-line animate-spin"></i>{t('buyPoints.preparingPayment')}</>
-                  ) : (
-                    <><i className="ri-bank-card-line text-lg"></i>{t('buyPoints.proceedToCard')}</>
-                  )}
-                </button>
-
-                {checkoutError && (
-                  <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                    <i className="ri-error-warning-line flex-shrink-0"></i>{checkoutError}
-                  </div>
-                )}
-
-                <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
-
-                <div className="flex items-center gap-3 my-3 text-xs text-gray-300">
-                  <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
-                </div>
-                <div className="space-y-2">
-                  <ApplePayButton
-                    amountMinor={totalHKD * 100}
-                    createOrder={gpayCreateOrder}
-                    onResult={handleGpayResult}
-                  />
-                  <GooglePayButton
-                    amountMinor={totalHKD * 100}
-                    createOrder={gpayCreateOrder}
-                    onResult={handleGpayResult}
-                  />
-                </div>
-              </>
             )}
+
+            <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
 
             <button
               onClick={() => setShowPaymentModal(false)}

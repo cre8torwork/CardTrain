@@ -58,7 +58,7 @@ const translation = {
   "buyPoints.orderSummary": "注文概要",
   "buyPoints.orderSummaryDesc": "購入内容をご確認ください",
   "buyPoints.payWithGlobalPayments": "Global Paymentsで安全に支払う",
-  "buyPoints.redirectNote": "Global Paymentsの安全な支払いページに移動します",
+  "buyPoints.redirectNote": "当サイト内の安全なチェックアウトページに進みます（外部サイトへは移動しません）",
   "buyPoints.proceedToCard": "カードで支払う",
   "buyPoints.preparingPayment": "安全な決済を準備中…",
   "buyPoints.cardNumber": "カード番号",
