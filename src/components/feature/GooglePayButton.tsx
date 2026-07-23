@@ -8,8 +8,17 @@ import { submitGooglePay } from '../../lib/checkout';
 // TEST environment needs no Google merchant id; PRODUCTION needs a real
 // `merchantId` from the Google Pay & Wallet Console.
 
+// CyberSource MID for the Google Pay rail (…201) — the gateway-side merchant id.
 const GATEWAY_MERCHANT_ID = 'gphk088034609201';
-const GOOGLE_ENV: 'TEST' | 'PRODUCTION' = 'TEST';
+
+// Google-side config. PRODUCTION additionally requires a Google merchant id from
+// the Google Pay & Wallet Console (pay.google.com/business/console) and an approved
+// integration; TEST needs neither. Flip via env, no code change:
+//   VITE_GOOGLE_PAY_ENV=PRODUCTION
+//   VITE_GOOGLE_PAY_MERCHANT_ID=<google merchant id>
+const GOOGLE_ENV: 'TEST' | 'PRODUCTION' =
+  import.meta.env.VITE_GOOGLE_PAY_ENV === 'PRODUCTION' ? 'PRODUCTION' : 'TEST';
+const GOOGLE_MERCHANT_ID: string | undefined = import.meta.env.VITE_GOOGLE_PAY_MERCHANT_ID;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare global { interface Window { google?: any } }
@@ -71,7 +80,10 @@ export default function GooglePayButton({ amountMinor, createOrder, onResult }: 
               const paymentData = await client.loadPaymentData({
                 apiVersion: 2, apiVersionMinor: 0,
                 allowedPaymentMethods: [BASE_CARD],
-                merchantInfo: { merchantName: 'Card Train' },
+                merchantInfo: {
+                  merchantName: 'Card Train',
+                  ...(GOOGLE_MERCHANT_ID ? { merchantId: GOOGLE_MERCHANT_ID } : {}),
+                },
                 transactionInfo: {
                   totalPriceStatus: 'FINAL',
                   totalPrice: (amountMinor / 100).toFixed(2),
