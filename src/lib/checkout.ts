@@ -85,10 +85,10 @@ export async function validateApplePayMerchant(validationURL: string): Promise<u
   return d.merchantSession;
 }
 
-/** Submit an Apple Pay token for an order. Backend is pending the wallet certs. */
-export async function submitApplePay(orderId: string, token: unknown): Promise<{ ok: boolean; message: string }> {
+/** Submit an Apple Pay payment for an order (token = base64 of token.paymentData). */
+export async function submitApplePay(orderId: string, token: string, cardType: string): Promise<{ ok: boolean; message: string }> {
   const { data, error } = await supabase.functions.invoke('apple-pay', {
-    body: { orderId, token },
+    body: { orderId, token, cardType },
   });
   if (error) return { ok: false, message: error.message ?? 'Apple Pay failed' };
   const d = data as { ok?: boolean; message?: string; error?: string };

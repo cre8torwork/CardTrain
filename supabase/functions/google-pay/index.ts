@@ -1,12 +1,9 @@
-// google-pay — receives the Google Pay token and submits it to CyberSource via
-// the Simple Order API (paymentSolution 012, MID gphk088034609201).
-//
-// ⚠️ NOT YET FUNCTIONAL: Simple Order API has no Deno/Node SDK, and this rail
-// needs the P12 certificate. Until the wallet backend (PHP/Java/.NET) + certs are
-// provided, this endpoint validates the request and returns a pending result so
-// the front-end button flow exists end to end. See the design spec §9.
+// google-pay — receives the Google Pay token and authorizes it via the PHP wallet
+// gateway (CyberSource Simple Order API, paymentSolution 012, MID …201). All order
+// state + points crediting live in submitWalletPayment (shared with apple-pay).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { submitWalletPayment } from "../_shared/payments/wallet-backend.ts";
 
 const ALLOWED_ORIGINS = [
   "https://cardtrain.com", "https://cardtrain.net",
@@ -31,14 +28,9 @@ serve(async (req: Request) => {
     });
   }
   const { orderId, token } = await req.json().catch(() => ({}));
-  if (!orderId || !token) {
-    return new Response(JSON.stringify({ error: "missing orderId or token" }), {
-      status: 400, headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
-    });
-  }
-  // Pending the wallet backend + P12 certs.
-  return new Response(
-    JSON.stringify({ ok: false, pending: true, message: "Google Pay is not yet available." }),
-    { status: 503, headers: { ...corsHeaders(origin), "Content-Type": "application/json" } },
-  );
+  const jwt = (req.headers.get("Authorization") || "").replace("Bearer ", "");
+  const { status, body } = await submitWalletPayment("google", jwt, orderId, token, null);
+  return new Response(JSON.stringify(body), {
+    status, headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+  });
 });

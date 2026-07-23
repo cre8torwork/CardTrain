@@ -1,0 +1,6 @@
+/vendor/
+/config/
+*.p12
+*.pem
+.env
+composer.lock

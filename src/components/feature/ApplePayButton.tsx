@@ -106,8 +106,14 @@ export default function ApplePayButton({ amountMinor, createOrder, onResult }: A
       }
     };
 
-    session.onpaymentauthorized = async (event: { payment: { token: unknown } }) => {
-      const res = await submitApplePay(orderId, event.payment.token);
+    session.onpaymentauthorized = async (event: {
+      payment: { token: { paymentData: unknown; paymentMethod?: { network?: string } } };
+    }) => {
+      // CyberSource decryption: base64 of the JSON paymentData; card network → cardType.
+      const token = window.btoa(JSON.stringify(event.payment.token.paymentData));
+      const network = (event.payment.token.paymentMethod?.network ?? '').toLowerCase();
+      const cardType = network.includes('master') ? '002' : network.includes('visa') ? '001' : '';
+      const res = await submitApplePay(orderId, token, cardType);
       session.completePayment(res.ok ? AP.STATUS_SUCCESS : AP.STATUS_FAILURE);
       onResult(res);
     };

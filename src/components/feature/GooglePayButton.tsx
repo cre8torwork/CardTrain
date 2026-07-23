@@ -79,7 +79,8 @@ export default function GooglePayButton({ amountMinor, createOrder, onResult }: 
                   countryCode: 'HK',
                 },
               });
-              const token = paymentData.paymentMethodData.tokenizationData.token;
+              // CyberSource decryption: base64-encode the Google token blob.
+              const token = window.btoa(paymentData.paymentMethodData.tokenizationData.token);
               const res = await submitGooglePay(orderId, token);
               onResult(res);
             } catch (e) {
