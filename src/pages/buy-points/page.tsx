@@ -6,6 +6,7 @@ import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
 import { createBuyPointsOrder, createCustomPointsOrder, signCheckout } from '../../lib/checkout';
+import OapmWalletButtons from '../../components/feature/OapmWalletButtons';
 
 interface PointsPackage {
   id: string;
@@ -94,6 +95,14 @@ export default function BuyPointsPage() {
 
   const totalCTP = isCustom && customCtpValid ? parsedCustomCtp : selectedPackage ? selectedPackage.ctp * quantity : 0;
   const totalHKD = isCustom && customCtpValid ? parsedCustomCtp / 10 : selectedPackage ? selectedPackage.hkd * quantity : 0;
+
+  // Create the order for whichever selection is active — shared by the card flow
+  // (below) and the OAPM wallet buttons, which create their own order on click.
+  const createSelectedOrder = async (): Promise<string> => {
+    if (isCustom && customCtpValid) return createCustomPointsOrder(parsedCustomCtp);
+    if (selectedPackage) return createBuyPointsOrder(selectedPackage.id, quantity);
+    throw new Error('No selection');
+  };
 
   // Create + sign the order, then hand off to the in-site /checkout page.
   const handlePayNow = async () => {
@@ -578,6 +587,11 @@ export default function BuyPointsPage() {
                 <i className="ri-error-warning-line flex-shrink-0"></i>{checkoutError}
               </div>
             )}
+
+            <div className="flex items-center gap-3 text-xs text-gray-300 my-4">
+              <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
+            </div>
+            <OapmWalletButtons createOrder={createSelectedOrder} successTo="/user" />
 
             <p className="text-xs text-gray-400 text-center mt-4">{t('buyPoints.redirectNote')}</p>
 

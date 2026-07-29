@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/hooks/useShopStore';
 import { placeShopOrder } from '@/hooks/useShopStore';
 import { createShopCardOrder, signCheckout } from '@/lib/checkout';
+import OapmWalletButtons from '@/components/feature/OapmWalletButtons';
 
 interface ShopCheckoutModalProps {
   cartItems: CartItem[];
@@ -53,7 +54,7 @@ export default function ShopCheckoutModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'points' | 'card'>('points');
+  const [paymentMethod, setPaymentMethod] = useState<'points' | 'card' | 'wallet'>('points');
   const [cardBusy, setCardBusy] = useState(false);
 
   const cardAvailable = cartItems.every((i) => i.product.hkdPriceMinor != null);
@@ -131,6 +132,17 @@ export default function ShopCheckoutModal({
     }
   };
 
+  // Validates shipping, then creates the order — used as the OapmWalletButtons
+  // createOrder callback, so validation errors surface in its own error box.
+  const createWalletOrder = async (): Promise<string> => {
+    const validationError = validate();
+    if (validationError) throw new Error(validationError);
+    return createShopCardOrder(
+      cartItems.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+      form,
+    );
+  };
+
   if (success) {
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -189,7 +201,7 @@ export default function ShopCheckoutModal({
           {/* Payment method */}
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-2">{t('shop.checkout.paymentMethod')}</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => { setPaymentMethod('points'); setError(''); }}
@@ -204,6 +216,14 @@ export default function ShopCheckoutModal({
                 className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'card' ? 'border-rose-400 bg-rose-50 text-rose-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
               >
                 {t('shop.checkout.payByCard')}<br /><span className="text-xs font-normal">{cardAvailable ? hkdTotalLabel : t('shop.checkout.cardUnavailable')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (cardAvailable) { setPaymentMethod('wallet'); setError(''); } }}
+                disabled={!cardAvailable}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${paymentMethod === 'wallet' ? 'border-rose-400 bg-rose-50 text-rose-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >
+                {t('oapm.payByWallet')}<br /><span className="text-xs font-normal">{cardAvailable ? hkdTotalLabel : t('shop.checkout.cardUnavailable')}</span>
               </button>
             </div>
           </div>
@@ -309,7 +329,9 @@ export default function ShopCheckoutModal({
               >
                 {t('shop.checkout.cancel')}
               </button>
-              {paymentMethod === 'card' ? (
+              {paymentMethod === 'wallet' ? (
+                <OapmWalletButtons createOrder={createWalletOrder} successTo="/user" className="flex-grow" />
+              ) : paymentMethod === 'card' ? (
                 <button
                   onClick={handleCardCheckout}
                   disabled={cardBusy || !cardAvailable}

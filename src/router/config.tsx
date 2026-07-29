@@ -33,6 +33,7 @@ import MfaVerifyPage from "../pages/mfa-verify/page";
 import MfaSetupPage from "../pages/mfa-setup/page";
 import BuyPointsPage from "../pages/buy-points/page";
 import CheckoutPage from "../pages/checkout/page";
+import OapmReturnPage from "../pages/oapm-return/page";
 
 const routes: RouteObject[] = [
   { path: "/", element: <Home /> },
@@ -42,6 +43,7 @@ const routes: RouteObject[] = [
   { path: "/shop/:id", element: <ShopDetailPage /> },
   { path: "/buy-points", element: <BuyPointsPage /> },
   { path: "/checkout", element: <CheckoutPage /> },
+  { path: "/oapm-return", element: <OapmReturnPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/user", element: <UserPage /> },
   { path: "/guide", element: <GuidePage /> },
