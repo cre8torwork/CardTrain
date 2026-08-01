@@ -460,13 +460,16 @@ export default function BuyPointsPage() {
                   <i className="ri-mastercard-line text-red-500 text-xl"></i>
                   <span className="text-gray-600">Mastercard</span>
                 </div>
+                {/* Only advertise methods we actually accept — GPAP's Website Review
+                    checks payment-mark accuracy. Apple/Google Pay return when their
+                    backend is live (see VITE_ENABLE_WALLETS). */}
                 <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm">
-                  <i className="ri-apple-line text-gray-800 text-xl"></i>
-                  <span className="text-gray-600">Apple Pay</span>
+                  <i className="ri-alipay-line text-blue-500 text-xl"></i>
+                  <span className="text-gray-600">Alipay</span>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm">
-                  <i className="ri-google-line text-blue-500 text-xl"></i>
-                  <span className="text-gray-600">Google Pay</span>
+                  <i className="ri-wechat-pay-line text-green-600 text-xl"></i>
+                  <span className="text-gray-600">WeChat Pay</span>
                 </div>
               </div>
             </div>

@@ -13,6 +13,13 @@ import type { SignedCheckout } from '../../lib/checkout';
 // this page — the customer is never redirected off the site (the card fields post
 // direct to CyberSource inside the page's payment iframe).
 
+// Apple Pay / Google Pay are HIDDEN until their backend is live. Both rails need
+// the PHP Simple Order gateway (P12 certs + a host); until then the buttons would
+// render and then fail with 503 — a dead payment button, which GPAP's Website
+// Review flags. Alipay/WeChat (OAPM) are unaffected; they render elsewhere.
+// Re-enable with VITE_ENABLE_WALLETS=true — no code change needed.
+const WALLETS_ENABLED = import.meta.env.VITE_ENABLE_WALLETS === 'true';
+
 export interface CheckoutState {
   orderId: string;
   checkout: SignedCheckout;
@@ -107,13 +114,17 @@ export default function CheckoutPage() {
                 onOutcome={setOutcome}
               />
 
-              <div className="flex items-center gap-3 text-xs text-gray-300">
-                <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
-              </div>
-              <div className="space-y-2">
-                <ApplePayButton amountMinor={state.amountMinor} createOrder={reuseOrder} onResult={handleWalletResult} />
-                <GooglePayButton amountMinor={state.amountMinor} createOrder={reuseOrder} onResult={handleWalletResult} />
-              </div>
+              {WALLETS_ENABLED && (
+                <>
+                  <div className="flex items-center gap-3 text-xs text-gray-300">
+                    <span className="flex-1 h-px bg-gray-100" />or<span className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="space-y-2">
+                    <ApplePayButton amountMinor={state.amountMinor} createOrder={reuseOrder} onResult={handleWalletResult} />
+                    <GooglePayButton amountMinor={state.amountMinor} createOrder={reuseOrder} onResult={handleWalletResult} />
+                  </div>
+                </>
+              )}
 
               <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 text-center">
                 <i className="ri-shield-check-line text-emerald-500"></i>
