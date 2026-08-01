@@ -12,6 +12,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildSignedRequestFields } from "../_shared/payments/secure-acceptance.ts";
 import { formatMinorUnits } from "../_shared/payments/money.ts";
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -21,24 +22,6 @@ const SA_SECRET_KEY = Deno.env.get("CYBS_SA_SECRET_KEY")!;
 // test: https://testsecureacceptance.cybersource.com/silent/pay
 // live: https://secureacceptance.cybersource.com/silent/pay
 const SA_ENDPOINT = Deno.env.get("CYBS_SA_ENDPOINT")!;
-
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com",
-  "https://cardtrain.net",
-  "https://www.cardtrain.com",
-  "https://www.cardtrain.net",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
 
 // A new, unique reference_number on EVERY request — including retries of the same
 // order (GPAP requirement). Double-charge protection lives in the order state

@@ -19,27 +19,10 @@ import {
   type BackOfficeAction,
 } from "../_shared/payments/order-state.ts";
 import { computeRefund } from "../_shared/payments/refunds.ts";
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com",
-  "https://cardtrain.net",
-  "https://www.cardtrain.com",
-  "https://www.cardtrain.net",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
 
 interface OrderRow {
   id: string;

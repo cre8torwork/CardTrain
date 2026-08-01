@@ -4,20 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { submitWalletPayment } from "../_shared/payments/wallet-backend.ts";
-
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com", "https://cardtrain.net",
-  "https://www.cardtrain.com", "https://www.cardtrain.net",
-  "http://localhost:5173", "http://localhost:3000",
-];
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";

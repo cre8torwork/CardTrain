@@ -20,6 +20,7 @@ import {
   type OapmPayScene,
 } from "../_shared/payments/oapm-fields.ts";
 import { formatMinorUnits } from "../_shared/payments/money.ts";
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -28,24 +29,6 @@ const OAPM_SECRET = Deno.env.get("OAPM_SECRET")!;
 // e.g. https://oapm.eftpay.com.hk/OAPM/v1/Servlet/ — production only, no sandbox.
 const OAPM_BASE_URL = Deno.env.get("OAPM_BASE_URL")!;
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cardtrain.com";
-
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com",
-  "https://cardtrain.net",
-  "https://www.cardtrain.com",
-  "https://www.cardtrain.net",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
 
 // Stable for the order's life (unlike CyberSource's per-attempt reference_number)
 // — used for Query/Refund lookups (design spec §4 note). Derived from the order

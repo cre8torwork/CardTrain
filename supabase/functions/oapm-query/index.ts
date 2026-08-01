@@ -16,30 +16,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { signOapmFields, verifyOapmSignature } from "../_shared/payments/oapm-sign.ts";
 import { paymentOutcomeFor, applyOapmPaymentOutcome } from "../_shared/payments/oapm-settle.ts";
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OAPM_USER_CONFIRM_KEY = Deno.env.get("OAPM_USER_CONFIRM_KEY")!;
 const OAPM_SECRET = Deno.env.get("OAPM_SECRET")!;
 const OAPM_BASE_URL = Deno.env.get("OAPM_BASE_URL")!;
-
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com",
-  "https://cardtrain.net",
-  "https://www.cardtrain.com",
-  "https://www.cardtrain.net",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
 
 function oapmTimeNow(): string {
   const d = new Date();

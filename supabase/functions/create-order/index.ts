@@ -15,14 +15,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Cards MID (Secure Acceptance Checkout API). Refunds must route back through it.
 const CARDS_MID = "gphk088034609200";
 
-const ALLOWED_ORIGINS = [
-  "https://cardtrain.com",
-  "https://cardtrain.net",
-  "https://www.cardtrain.com",
-  "https://www.cardtrain.net",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
+import { corsHeaders } from "../_shared/payments/cors.ts";
 
 // ── Inlined from _shared/payments/money.ts ──
 function toMinorUnits(hkd: number): number {
@@ -58,15 +51,6 @@ function resolvePackage(id: string, quantity: number): { amountMinor: number; ct
   if (!pkg) throw new Error(`unknown package: ${id}`);
   return { amountMinor: toMinorUnits(pkg.hkd * quantity), ctp: pkg.ctp * quantity };
 }
-
-const corsHeaders = (origin: string) => {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-};
 
 interface CartItemInput {
   productId: string;
