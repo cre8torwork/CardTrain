@@ -8,13 +8,13 @@ export default function SecureBadges({ className = '' }: { className?: string })
       <img
         src="/payment-logos/visa-secure.png"
         alt="Visa Secure"
-        className="h-6 w-auto"
+        className="h-8 w-auto"
         loading="lazy"
       />
       <img
         src="/payment-logos/mc-identity-check.png"
         alt="Mastercard Identity Check"
-        className="h-6 w-auto"
+        className="h-8 w-auto"
         loading="lazy"
       />
     </div>
