@@ -69,20 +69,29 @@ function confirmationPage(category: string, message: string, referenceNumber = "
 const htmlResponse = (body: string, status: number) =>
   new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 
+/**
+ * Credit CTP exactly once for a paid order.
+ *
+ * Returns the insert error instead of swallowing it. This matters: the money has
+ * ALREADY been taken by the time we get here, so a silent failure means a paid
+ * order with zero points and no trace — the worst possible outcome. Observed for
+ * real: `points.user_id` has a FK to public.users(id), so an auth user without a
+ * matching public.users row fails with 23503 and the customer gets nothing.
+ */
 async function creditPointsOnce(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   ctp: number,
   idempotencyKey: string,
-): Promise<void> {
+): Promise<{ error: unknown | null }> {
   // Same idempotency idiom as user-points: dedupe on `description`.
   const { data: existing } = await supabase
     .from("points")
     .select("id")
     .eq("description", idempotencyKey)
     .maybeSingle();
-  if (existing) return;
-  await supabase.from("points").insert({
+  if (existing) return { error: null };
+  const { error } = await supabase.from("points").insert({
     id: crypto.randomUUID(),
     user_id: userId,
     amount: ctp,
@@ -90,6 +99,7 @@ async function creditPointsOnce(
     description: idempotencyKey,
     created_at: new Date().toISOString(),
   });
+  return { error: error ?? null };
 }
 
 serve(async (req: Request) => {
@@ -146,7 +156,26 @@ serve(async (req: Request) => {
 
         // Credit points only if we actually claimed it now, and only for Buy Points.
         if (claimed && claimed.length > 0 && order.kind === "buy_points" && order.ctp_amount) {
-          await creditPointsOnce(supabase, order.user_id, order.ctp_amount, `cybs:${transactionId}`);
+          const { error: creditError } = await creditPointsOnce(
+            supabase, order.user_id, order.ctp_amount, `cybs:${transactionId}`,
+          );
+          if (creditError) {
+            // Money is already taken. Never fail silently — record it so the order
+            // can be found and the points granted manually.
+            console.error("[checkout-response] POINTS CREDIT FAILED", order.id, creditError);
+            await supabase.from("payment_events").insert({
+              order_id: order.id,
+              type: "credit_failed",
+              amount_minor: order.amount_minor,
+              reason_code: reasonCode,
+              actor: "system",
+              detail: {
+                ctp_amount: order.ctp_amount,
+                transaction_id: transactionId,
+                error: String((creditError as { message?: string })?.message ?? creditError),
+              },
+            });
+          }
         }
       } else {
         await supabase
