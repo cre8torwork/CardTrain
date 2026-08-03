@@ -11,6 +11,13 @@ interface CardPaymentFormProps extends SignedCheckout {
   onSubmitted?: () => void;
 }
 
+/** Digits only — what CyberSource must receive. */
+const cardDigits = (v: string) => v.replace(/\D/g, '').slice(0, 19);
+
+/** Group into 4s for readability while typing (display only). */
+const formatCardNumber = (v: string) =>
+  cardDigits(v).replace(/(.{4})/g, '$1 ').trim();
+
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 11 }, (_, i) => String(CURRENT_YEAR + i));
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -29,7 +36,8 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
   const [cvn, setCvn] = useState('');
   const [error, setError] = useState('');
 
-  const cardType = detectCardType(number) ?? '';
+  const digits = cardDigits(number);
+  const cardType = detectCardType(digits) ?? '';
   const expiry = month && year ? `${month}-${year}` : ''; // CyberSource wants MM-yyyy
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -57,15 +65,21 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
       <input type="hidden" name="card_type" value={cardType} />
       <input type="hidden" name="card_expiry_date" value={expiry} />
 
+      {/* CyberSource rejects a card number containing spaces with reason_code 102
+          ("Request parameters are invalid or missing") — and because 102 is a
+          validation reject, no transaction is created, so it cannot even be found
+          in the Business Center. The visible field stays formatted for
+          readability; a hidden field carries the DIGITS ONLY that we submit. */}
+      <input type="hidden" name="card_number" value={digits} />
       <div>
         <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.cardNumber')}</label>
         <input
-          name="card_number"
           inputMode="numeric"
           autoComplete="cc-number"
           placeholder="4000 0000 0000 0000"
           value={number}
-          onChange={(e) => { setNumber(e.target.value); setError(''); }}
+          maxLength={23} // 19 digits + 4 grouping spaces
+          onChange={(e) => { setNumber(formatCardNumber(e.target.value)); setError(''); }}
           className={input}
         />
       </div>

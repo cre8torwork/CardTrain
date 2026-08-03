@@ -12,6 +12,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verifyResponseSignature } from "../_shared/payments/secure-acceptance.ts";
 import { confirmationFor } from "../_shared/payments/reason-codes.ts";
+import { isPointsPurchase, paidStatusFor } from "../_shared/payments/order-kind.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -134,7 +135,7 @@ serve(async (req: Request) => {
     if (order) {
       await supabase.from("payment_events").insert({
         order_id: order.id,
-        type: reasonCode === 100 ? (order.kind === "buy_points" ? "sale" : "auth") : "decline",
+        type: reasonCode === 100 ? (isPointsPurchase(order.kind) ? "sale" : "auth") : "decline",
         amount_minor: order.amount_minor,
         reason_code: reasonCode,
         actor: "system",
@@ -146,7 +147,7 @@ serve(async (req: Request) => {
         const { data: claimed } = await supabase
           .from("orders")
           .update({
-            status: order.kind === "buy_points" ? "paid" : "authorized",
+            status: paidStatusFor(order.kind),
             cybersource_request_id: transactionId,
             updated_at: new Date().toISOString(),
           })
@@ -155,7 +156,7 @@ serve(async (req: Request) => {
           .select("id");
 
         // Credit points only if we actually claimed it now, and only for Buy Points.
-        if (claimed && claimed.length > 0 && order.kind === "buy_points" && order.ctp_amount) {
+        if (claimed && claimed.length > 0 && isPointsPurchase(order.kind) && order.ctp_amount) {
           const { error: creditError } = await creditPointsOnce(
             supabase, order.user_id, order.ctp_amount, `cybs:${transactionId}`,
           );

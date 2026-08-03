@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildSignedRequestFields } from "../_shared/payments/secure-acceptance.ts";
 import { formatMinorUnits } from "../_shared/payments/money.ts";
 import { corsHeaders } from "../_shared/payments/cors.ts";
+import { transactionTypeFor } from "../_shared/payments/order-kind.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -99,7 +100,7 @@ serve(async (req: Request) => {
         transactionUuid: crypto.randomUUID(),
         signedDateTime: signedDateTimeNow(),
         locale: "en",
-        transactionType: order.kind === "buy_points" ? "sale" : "authorization",
+        transactionType: transactionTypeFor(order.kind),
         referenceNumber,
         amount: formatMinorUnits(order.amount_minor),
         currency: order.currency,
