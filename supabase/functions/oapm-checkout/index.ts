@@ -2,11 +2,20 @@
 // re-deriving the amount server-side, and returns the pay_apptrade URL the browser
 // redirects to (WEB: QR page in the same tab; WAP: app deep-link).
 //
-// ⚠️ PENDING LIVE VERIFICATION: OAPM has no sandbox — the fetch() call below is
-// real production money the first time it runs. The signing algorithm's exact
-// digest encoding is unverified (see _shared/payments/oapm-sign.ts). This function
-// is NEVER exercised against oapm.eftpay.com.hk during development/tests — the
-// first live call is a deliberate, owner-supervised step (design spec §7, §10).
+// Signing is byte-verified against a live EFT response (see
+// _shared/payments/oapm-sign.ts, 2026-08-04) — this function's own fetch() below,
+// specifically, has still not been exercised end to end (that verification came
+// from a manual Postman Sale, not a call through this function). No sandbox
+// exists, so treat the first real invocation through this code path as worth
+// watching closely rather than as fully proven.
+//
+// return_url note (corrected 2026-08-04): the design spec assumed return_url
+// carries no parameters (per EFT's docs). A live redirect showed EFT DOES append
+// the full signed trade_status_sync payload as query params on return — same
+// shape as the notify webhook. We don't rely on this (oapm-notify/oapm-query stay
+// the source of truth — a browser redirect is still not proof of payment on its
+// own without verifying that signature), but /oapm-return could read+verify it
+// for an instant result instead of waiting on the query poll. Not yet done.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";

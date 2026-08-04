@@ -101,7 +101,7 @@ already documented in this repo's `_shared/payments/README.md`.
 | `subject` | Y | ≤127 chars |
 | `wallet` | Y | `ALIPAYCN` / `ALIPAYHK` / `WECHATCN` (`WECHATHK` also exists — open question §9) |
 | `pay_scene` | Y (WAP) / optional (WEB, defaults WEB) | `WEB` / `WAP` — **set explicitly, always**; EFT's own WeChat-WAP Postman sample defaults this to `"WEB"` by mistake |
-| `notify_url` / `return_url` | Y | `return_url` "cannot carry parameters" — do not rely on it for state |
+| `notify_url` / `return_url` | Y | ~~`return_url` "cannot carry parameters"~~ **correction, 2026-08-04:** a live redirect showed EFT *does* append the full signed `trade_status_sync` payload as query params on return — the docs' "cannot carry parameters" refers to the URL we configure, not what EFT sends back. Still don't rely on it as the sole state source (a browser round-trip isn't proof on its own — verify the signature same as notify) — `oapm-notify`/`oapm-query` stay authoritative, but this could feed an instant result instead of a poll. |
 | `active_time` | N | link validity, seconds, default 1800 |
 | `lang` | N | `cn` / `en` / `hk` — map from the app's existing i18n locale |
 | `time` | Y | `yyyyMMddHHmmss` |
@@ -174,19 +174,24 @@ Add:
 Same invariants as the card rail: amounts in integer HKD-cent minor units end
 to end; CTP credited server-side exactly once, guarded on `oapm_eft_trade_no`,
 only on a **verified** `TRADE_SUCCESS` from notify or query — never a browser
-claim (`return_url` carries no parameters, so the browser literally cannot
-make a claim here, which removes a whole class of bug the card rail has to
-guard against explicitly).
+claim on its own (a redirect *can* carry a signed payload, per the §4
+correction, but presence of query params isn't proof — only a verified
+signature is, same bar as notify).
 
-## 7. Setup status (2026-07-28)
+## 7. Setup status (2026-07-28, updated 2026-08-04)
 
 - ✅ `OAPM_USER_CONFIRM_KEY`, `OAPM_SECRET`, `OAPM_BASE_URL` set in the
   Card Train Supabase project (`cdsrzczbnbhlmiebxzfb`) secrets store.
 - ✅ Signing algorithm confirmed against EFT's official API docs
   (`oapm.eftpay.com.cn/oapm-docs/v1/`), not just the (buggy in places)
   Postman sample.
-- ⬜ Not yet byte-verified against a real live response (no sandbox exists —
-  first live call *is* the verification).
+- ✅ **2026-08-04 — byte-verified against a real live response.** A manual
+  Postman Alipay HK Sale (owner-run) returned a `TRADE_SUCCESS` redirect;
+  recomputing `SHA256(secret + sorted params)` over its query fields
+  reproduced the given `sign` exactly. Lowercase hex confirmed correct.
+- ⬜ `oapm-checkout`'s own live fetch() (as opposed to the Postman client) is
+  still unexercised end to end — the verification above came from a manual
+  Postman call, not a call through our deployed function.
 
 ## 8. Known gaps/bugs in EFT's own reference material (do not blindly copy)
 
@@ -220,7 +225,7 @@ guard against explicitly).
 | Risk | Severity | Mitigation |
 |---|---|---|
 | No sandbox — every test is real money | High | Small fixed test amounts (HK$0.1–1.2) per the test plan; video + JSON evidence required by EFT anyway |
-| Signature algorithm unverified against a live response | High | First live call is a signing self-test before any UI wiring goes live |
+| ~~Signature algorithm unverified against a live response~~ | Resolved 2026-08-04 | Byte-verified against a real live `TRADE_SUCCESS` redirect (§7) |
 | `return_url` carries no parameters | Medium (mitigated by design) | Never treat return_url as a state source; notify + query only |
 | Refund `service` field ambiguity | Medium | Verify on first live refund call before the admin refund UI ships |
 | Double-charge / double-credit on retry | High | Same invariant as CyberSource: idempotent on `oapm_eft_trade_no`, one successful Sale per order |

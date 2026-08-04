@@ -13,14 +13,10 @@
 // Uses Web Crypto so this module runs in Deno (edge runtime) and Node (tests) —
 // same dual-runtime pattern as secure-acceptance.ts.
 //
-// ⚠️ UNVERIFIED: EFT's docs specify the algorithm as "SHA256" without stating the
-// output encoding (hex vs base64) or case. This implementation uses lowercase hex,
-// the most common convention for a bare SHA-256 string-to-sign (as opposed to
-// CyberSource's HMAC-Base64). This has NOT been byte-matched against a real EFT
-// request/response — there is no sandbox, so the first live call is the
-// verification (design spec §7, §10 risk #2). If it turns out to be base64 or
-// uppercase hex, only `sha256Hex` below needs to change — param-string
-// construction and the verify/compare flow are unaffected.
+// ✅ VERIFIED 2026-08-04: byte-matched against a real live EFT redirect (a manual
+// Postman Alipay HK Sale, TRADE_SUCCESS). Recomputing SHA256(secret + sorted
+// params) over the return_url's query fields reproduced its `sign` exactly.
+// Lowercase hex confirmed correct (design spec §7, §10 risk #2 — resolved).
 
 const enc = new TextEncoder();
 

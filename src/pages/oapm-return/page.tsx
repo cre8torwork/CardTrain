@@ -5,10 +5,17 @@ import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
 import { consumeOapmPendingOrder, queryOapmOrder } from '../../lib/checkout';
 
-// Landing page for OAPM's return_url. return_url carries NO parameters (design
-// spec §4) — order state comes only from oapm-notify (already applied by the time
-// the customer gets here, in the common case) or oapm-query, which this page
-// polls as the fallback. We never infer an outcome from the browser alone.
+// Landing page for OAPM's return_url. Order state comes only from oapm-notify
+// (already applied by the time the customer gets here, in the common case) or
+// oapm-query, which this page polls as the fallback. We never infer an outcome
+// from the browser alone.
+//
+// Note (corrected 2026-08-04): earlier assumed return_url carries no parameters
+// (per EFT's docs). A live redirect showed EFT actually appends the full signed
+// trade_status_sync payload as query params here — same shape as the notify
+// webhook. Not read yet (would need the same signature verification as notify to
+// be trustworthy, not just presence) — polling oapm-query is correct and safe as
+// is; this would only be a latency improvement, not a correctness fix.
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 10; // ~30s — covers the common "notify already landed" case
