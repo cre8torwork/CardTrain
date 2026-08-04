@@ -88,7 +88,7 @@ const translation = {
   "buyPoints.customAmountDesc": "直接输入您需要的 CTP 数量",
   "buyPoints.enterCtp": "输入 CTP 数量",
   "buyPoints.ctpPlaceholder": "例如 750",
-  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 最低 50 CTP &middot; 须为 10 的倍数",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 請輸入 1 至 999,990 之間的整數 CTP",
   "buyPoints.customCtpLabel": "自订 CTP",
 };
 

@@ -73,7 +73,7 @@ const translation = {
   "buyPoints.customAmountDesc": "Type exactly how many CTP you want",
   "buyPoints.enterCtp": "Enter CTP amount",
   "buyPoints.ctpPlaceholder": "e.g. 750",
-  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; Min 50 CTP &middot; Multiples of 10 only",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; Enter a whole number from 1 to 999,990 CTP",
   "buyPoints.customCtpLabel": "Custom CTP",
 };
 

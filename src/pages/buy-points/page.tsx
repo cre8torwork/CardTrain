@@ -26,6 +26,14 @@ const POINTS_PACKAGES: PointsPackage[] = [
   { id: 'pkg-5000', hkd: 5000, ctp: 50000, popular: false, bestValue: false },
 ];
 
+// Custom amounts no longer have to be multiples of 10, so HKD can be fractional
+// (e.g. 55 CTP = HK$5.50). Show cents only when there are cents.
+const formatHkd = (hkd: number) =>
+  hkd.toLocaleString('en-US', {
+    minimumFractionDigits: Number.isInteger(hkd) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+
 const FAQ_ITEMS = [
   { q: 'buyPoints.faq.q1', a: 'buyPoints.faq.a1' },
   { q: 'buyPoints.faq.q2', a: 'buyPoints.faq.a2' },
@@ -81,7 +89,9 @@ export default function BuyPointsPage() {
   };
 
   const parsedCustomCtp = parseInt(customCtp, 10);
-  const customCtpValid = isCustom && Number.isInteger(parsedCustomCtp) && parsedCustomCtp >= 50 && parsedCustomCtp % 10 === 0;
+  // Any whole CTP amount is allowed — the only bound is the server's cap.
+  // Mirrors the create-order edge function so the UI never offers an amount it rejects.
+  const customCtpValid = isCustom && Number.isInteger(parsedCustomCtp) && parsedCustomCtp >= 1 && parsedCustomCtp <= 999990;
 
   const handleProceedPayment = () => {
     if (!isLoggedIn) {
@@ -126,8 +136,8 @@ export default function BuyPointsPage() {
         state: {
           orderId,
           checkout: signed,
-          amountMinor: totalHKD * 100,
-          amountLabel: `HK$ ${totalHKD.toLocaleString()}`,
+          amountMinor: Math.round(totalHKD * 100),
+          amountLabel: `HK$ ${formatHkd(totalHKD)}`,
           lines: [
             { label: t('buyPoints.packageLabel'), value: packageLabel },
             { label: t('buyPoints.quantityLabel'), value: isCustom ? '1' : String(quantity) },
@@ -331,8 +341,9 @@ export default function BuyPointsPage() {
                       onChange={(e) => setCustomCtp(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                       placeholder={t('buyPoints.ctpPlaceholder')}
-                      step="10"
-                      min="50"
+                      step="1"
+                      min="1"
+                      max="999990"
                       className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 transition-all"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">CTP</span>
@@ -347,7 +358,7 @@ export default function BuyPointsPage() {
                 {customCtpValid && (
                   <div className="bg-rose-50 rounded-xl px-3 py-2.5 flex items-center justify-between">
                     <span className="text-xs text-gray-500">{t('buyPoints.totalAmount')}</span>
-                    <span className="text-lg font-black text-gray-900">HK$ {(parsedCustomCtp / 10).toLocaleString()}</span>
+                    <span className="text-lg font-black text-gray-900">HK$ {formatHkd(parsedCustomCtp / 10)}</span>
                   </div>
                 )}
               </div>
@@ -377,14 +388,14 @@ export default function BuyPointsPage() {
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
               {isCustom && customCtpValid ? (
                 <span className="font-semibold text-gray-700">
-                  {parsedCustomCtp.toLocaleString()} CTP &mdash; HK$ {(parsedCustomCtp / 10).toLocaleString()}
+                  {parsedCustomCtp.toLocaleString()} CTP &mdash; HK$ {formatHkd(parsedCustomCtp / 10)}
                 </span>
               ) : selectedPackage ? (
                 <>
                   <span>{selectedPackage.ctp.toLocaleString()} CTP × {quantity}</span>
                   <span className="text-gray-300">|</span>
                   <span className="font-semibold text-gray-700">
-                    {t('buyPoints.subtotal', { hkd: totalHKD.toLocaleString(), ctp: totalCTP.toLocaleString() })}
+                    {t('buyPoints.subtotal', { hkd: formatHkd(totalHKD), ctp: totalCTP.toLocaleString() })}
                   </span>
                 </>
               ) : null}
@@ -401,7 +412,7 @@ export default function BuyPointsPage() {
           >
             <i className="ri-bank-card-line text-xl"></i>
             {(selectedPackage || customCtpValid)
-              ? t('buyPoints.payNow', { hkd: totalHKD.toLocaleString(), ctp: totalCTP.toLocaleString() })
+              ? t('buyPoints.payNow', { hkd: formatHkd(totalHKD), ctp: totalCTP.toLocaleString() })
               : t('buyPoints.selectPackageFirst')}
           </button>
           {!isLoggedIn && (
@@ -565,7 +576,7 @@ export default function BuyPointsPage() {
               </div>
               <div className="border-t border-gray-200 pt-2 flex justify-between">
                 <span className="text-gray-500 text-sm">{t('buyPoints.totalAmount')}</span>
-                <span className="font-bold text-gray-900 text-lg">HK$ {totalHKD.toLocaleString()}</span>
+                <span className="font-bold text-gray-900 text-lg">HK$ {formatHkd(totalHKD)}</span>
               </div>
               <div className="flex justify-between text-xs text-gray-400 pt-1">
                 <span>{t('buyPoints.exchangeRate')}</span>

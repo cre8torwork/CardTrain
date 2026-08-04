@@ -73,7 +73,7 @@ const translation = {
   "buyPoints.customAmountDesc": "必要なCTP数を直接入力",
   "buyPoints.enterCtp": "CTP数を入力",
   "buyPoints.ctpPlaceholder": "例: 750",
-  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 最低 50 CTP &middot; 10の倍数のみ",
+  "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 1〜999,990 CTP の整数を入力してください",
   "buyPoints.customCtpLabel": "カスタム CTP",
 };
 

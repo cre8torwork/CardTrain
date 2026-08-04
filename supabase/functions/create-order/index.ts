@@ -99,11 +99,11 @@ serve(async (req: Request) => {
 
     if (kind === "buy_points_custom") {
       const ctp = Number(body.ctp);
-      if (!Number.isInteger(ctp) || ctp < 50 || ctp > 999990) {
-        return json({ error: "CTP must be between 50 and 999,990" }, 400);
-      }
-      if (ctp % 10 !== 0) {
-        return json({ error: "CTP must be a multiple of 10 (HK$1 = 10 CTP)" }, 400);
+      // Any whole CTP amount is accepted; only the upper cap remains. Amounts that
+      // are not multiples of 10 give a fractional HKD price, which toMinorUnits rounds
+      // to exact cents (55 CTP = HK$5.50 = 550 minor units).
+      if (!Number.isInteger(ctp) || ctp < 1 || ctp > 999990) {
+        return json({ error: "CTP must be a whole number between 1 and 999,990" }, 400);
       }
       const hkd = ctp / 10;
       const amountMinor = toMinorUnits(hkd);
