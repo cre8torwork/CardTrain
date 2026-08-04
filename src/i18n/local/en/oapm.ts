@@ -4,8 +4,9 @@ const translation = {
   "oapm.wechatPay": "WeChat Pay",
   "oapm.payByWallet": "Alipay / WeChat Pay",
   "oapm.return.checking": "Checking your payment status…",
-  "oapm.return.paid": "Payment received — thank you!",
-  "oapm.return.declined": "Payment was not completed. Please try again.",
+  "oapm.return.paid": "Transaction Success — thank you!",
+  "oapm.return.tradeNo": "Reference no.: {{tradeNo}}",
+  "oapm.return.declined": "Transaction Failed. Please try again.",
   "oapm.return.pending": "We're still confirming your payment. This can take a moment — check My Page shortly, or contact support if it doesn't update.",
 };
 

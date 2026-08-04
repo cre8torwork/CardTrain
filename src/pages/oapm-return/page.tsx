@@ -26,6 +26,10 @@ export default function OapmReturnPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('checking');
+  // EFT's test-plan acceptance criteria require the trade number on the result
+  // page (and in any transaction-notification message) — see oapm-query, which
+  // now returns it from orders.oapm_eft_trade_no.
+  const [tradeNo, setTradeNo] = useState<string | null>(null);
   const pendingRef = useRef(consumeOapmPendingOrder());
 
   useEffect(() => {
@@ -41,8 +45,9 @@ export default function OapmReturnPage() {
     const poll = async () => {
       attempts += 1;
       try {
-        const { status } = await queryOapmOrder(pending.orderId);
+        const { status, eftTradeNo } = await queryOapmOrder(pending.orderId);
         if (cancelled) return;
+        if (eftTradeNo) setTradeNo(eftTradeNo);
         if (status === 'paid') return setPhase('paid');
         if (status === 'declined' || status === 'error') return setPhase('declined');
         if (attempts >= MAX_POLLS) return setPhase('pending');
@@ -76,7 +81,12 @@ export default function OapmReturnPage() {
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-emerald-100 text-emerald-600">
               <i className="ri-checkbox-circle-fill text-3xl"></i>
             </div>
-            <p className="text-gray-700">{t('oapm.return.paid')}</p>
+            <p className="text-gray-700 font-semibold">{t('oapm.return.paid')}</p>
+            {tradeNo && (
+              <p className="mt-2 text-sm text-gray-500">
+                {t('oapm.return.tradeNo', { tradeNo })}
+              </p>
+            )}
             <button
               onClick={() => navigate(pending?.successTo ?? '/user')}
               className="mt-6 px-8 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold cursor-pointer whitespace-nowrap"

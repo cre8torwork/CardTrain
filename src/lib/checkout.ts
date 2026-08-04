@@ -132,14 +132,14 @@ export async function createOapmCheckout(
 }
 
 /** Poll our own order status (kept current by oapm-notify / oapm-query) after a wallet redirect. */
-export async function queryOapmOrder(orderId: string): Promise<{ status: string }> {
+export async function queryOapmOrder(orderId: string): Promise<{ status: string; eftTradeNo: string | null }> {
   const { data, error } = await supabase.functions.invoke('oapm-query', {
     body: { orderId },
   });
   if (error) throw error;
-  const d = data as { status?: string; error?: string };
+  const d = data as { status?: string; eftTradeNo?: string | null; error?: string };
   if (!d?.status) throw new Error(d?.error || 'Failed to check order status');
-  return { status: d.status };
+  return { status: d.status, eftTradeNo: d.eftTradeNo ?? null };
 }
 
 const OAPM_PENDING_KEY = 'cardtrain_oapm_pending_order';

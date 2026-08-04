@@ -76,11 +76,11 @@ serve(async (req: Request) => {
 
     // Already resolved — return the cached status, no need to call EFT again.
     if (order.status !== "created" && order.status !== "pending") {
-      return json({ status: order.status }, 200);
+      return json({ status: order.status, eftTradeNo: order.oapm_eft_trade_no ?? null }, 200);
     }
     if (!order.oapm_out_trade_no) {
       // The OAPM Sale request was never sent for this order yet.
-      return json({ status: order.status }, 200);
+      return json({ status: order.status, eftTradeNo: null }, 200);
     }
 
     const fields: Record<string, string> = {
@@ -110,7 +110,7 @@ serve(async (req: Request) => {
     const tradeStatus = reply.trade_status ?? "";
     const outcome = paymentOutcomeFor(tradeStatus);
     if (outcome === "pending") {
-      return json({ status: order.status }, 200);
+      return json({ status: order.status, eftTradeNo: order.oapm_eft_trade_no ?? null }, 200);
     }
 
     const eftTradeNo = reply.eft_trade_no ?? order.oapm_eft_trade_no ?? "";
@@ -118,7 +118,7 @@ serve(async (req: Request) => {
       source: "query",
       trade_status: tradeStatus,
     });
-    return json({ status: result.status }, 200);
+    return json({ status: result.status, eftTradeNo: eftTradeNo || null }, 200);
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
