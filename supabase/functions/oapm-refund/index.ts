@@ -17,7 +17,7 @@ import { assertCanApply } from "../_shared/payments/order-state.ts";
 import { computeRefund } from "../_shared/payments/refunds.ts";
 import { refundOutcomeFor } from "../_shared/payments/oapm-settle.ts";
 import { signOapmFields } from "../_shared/payments/oapm-sign.ts";
-import { REFUND_SERVICE, payTypeForWallet, type OapmWallet } from "../_shared/payments/oapm-fields.ts";
+import { REFUND_SERVICE, payTypeForWallet, oapmTimeNow, type OapmWallet } from "../_shared/payments/oapm-fields.ts";
 import { formatMinorUnits } from "../_shared/payments/money.ts";
 import { corsHeaders } from "../_shared/payments/cors.ts";
 
@@ -26,12 +26,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OAPM_USER_CONFIRM_KEY = Deno.env.get("OAPM_USER_CONFIRM_KEY")!;
 const OAPM_SECRET = Deno.env.get("OAPM_SECRET")!;
 const OAPM_BASE_URL = Deno.env.get("OAPM_BASE_URL")!;
-
-function oapmTimeNow(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-}
 
 serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";

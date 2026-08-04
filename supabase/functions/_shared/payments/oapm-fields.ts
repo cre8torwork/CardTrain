@@ -48,3 +48,21 @@ export function buyerTypeFromUserAgent(userAgent: string): OapmBuyerType {
 export function paySceneFromUserAgent(userAgent: string): OapmPayScene {
   return /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'WAP' : 'WEB';
 }
+
+/**
+ * `time` field, format yyyyMMddHHmmss — BUG FIX 2026-08-04: must be Beijing/HK
+ * time (UTC+8), not UTC. EFT's docs don't state a timezone, so this originally
+ * defaulted to UTC (documented as a guess in the design spec) — but EFT's own
+ * reference Postman scripts compute it as UTC+8 (the Alipay-Web Sale script
+ * shifts explicitly by 8h; the Refund script uses "local time" from a
+ * Hong-Kong-based tester, same offset). Sending UTC put every request's `time`
+ * 8 hours behind what EFT's server expects as "now", which is consistent with
+ * real Sale requests through this app being rejected (non-2xx from oapm-checkout)
+ * while an identical-shape manual Postman call succeeded. Takes an optional Date
+ * for testability; defaults to the real current time.
+ */
+export function oapmTimeNow(now: Date = new Date()): string {
+  const beijing = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${beijing.getUTCFullYear()}${pad(beijing.getUTCMonth() + 1)}${pad(beijing.getUTCDate())}${pad(beijing.getUTCHours())}${pad(beijing.getUTCMinutes())}${pad(beijing.getUTCSeconds())}`;
+}

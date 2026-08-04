@@ -5,6 +5,7 @@ import {
   saleServiceFor,
   buyerTypeFromUserAgent,
   paySceneFromUserAgent,
+  oapmTimeNow,
   REFUND_SERVICE,
   VALID_OAPM_WALLETS,
 } from './oapm-fields.ts';
@@ -66,4 +67,21 @@ test('paySceneFromUserAgent: mobile UAs get WAP, desktop UAs get WEB', () => {
 
 test('VALID_OAPM_WALLETS lists exactly the three wallets in scope (WECHATHK excluded — open question §9)', () => {
   assert.deepEqual([...VALID_OAPM_WALLETS].sort(), ['ALIPAYCN', 'ALIPAYHK', 'WECHATCN']);
+});
+
+test('oapmTimeNow is Beijing/HK time (UTC+8), not UTC — regression guard for the 2026-08-04 rejection bug', () => {
+  // 2026-08-04 00:00:00 UTC -> 2026-08-04 08:00:00 Beijing/HK time
+  assert.equal(oapmTimeNow(new Date('2026-08-04T00:00:00.000Z')), '20260804080000');
+  // Crosses a calendar day: 2026-08-04 20:00:00 UTC -> 2026-08-05 04:00:00 Beijing/HK
+  assert.equal(oapmTimeNow(new Date('2026-08-04T20:00:00.000Z')), '20260805040000');
+});
+
+test('oapmTimeNow matches the real live payload from the 2026-08-04 test (given=UTC+8, not the UTC time our old bug would have sent)', () => {
+  // The verified live redirect (see oapm-sign.test.ts) had time=20260804105601 —
+  // that request left our servers with the OLD (buggy, UTC) implementation,
+  // meaning the corresponding real UTC instant was ~08 hours earlier than what
+  // "20260804105601" would mean if read as Beijing time. This test just pins the
+  // conversion direction so a future edit can't silently flip the sign again.
+  const utcInstant = new Date('2026-08-04T02:56:01.000Z'); // 10:56:01 UTC+8
+  assert.equal(oapmTimeNow(utcInstant), '20260804105601');
 });

@@ -3,11 +3,14 @@
 // redirects to (WEB: QR page in the same tab; WAP: app deep-link).
 //
 // Signing is byte-verified against a live EFT response (see
-// _shared/payments/oapm-sign.ts, 2026-08-04) — this function's own fetch() below,
-// specifically, has still not been exercised end to end (that verification came
-// from a manual Postman Sale, not a call through this function). No sandbox
-// exists, so treat the first real invocation through this code path as worth
-// watching closely rather than as fully proven.
+// _shared/payments/oapm-sign.ts, 2026-08-04).
+//
+// BUG FIXED 2026-08-04: `time` was generated in plain UTC instead of Beijing/HK
+// time (UTC+8) — see oapm-fields.ts `oapmTimeNow`. This is the confirmed root
+// cause of real Sale requests through this app being rejected by EFT (non-2xx
+// from this function) while an identical-shape manual Postman call succeeded —
+// our timestamp was landing 8 hours "in the past" relative to what EFT's server
+// expects as current time.
 //
 // return_url note (corrected 2026-08-04): the design spec assumed return_url
 // carries no parameters (per EFT's docs). A live redirect showed EFT DOES append
@@ -24,6 +27,7 @@ import {
   saleServiceFor,
   payTypeForWallet,
   buyerTypeFromUserAgent,
+  oapmTimeNow,
   VALID_OAPM_WALLETS,
   type OapmWallet,
   type OapmPayScene,
@@ -46,13 +50,6 @@ function outTradeNoFor(orderId: string): string {
   return `CT${orderId.replace(/-/g, "").slice(0, 24)}`;
 }
 
-// yyyyMMddHHmmss (UTC). EFT's docs don't state a timezone; UTC is the
-// documented-safe default until byte-verified against a live response.
-function oapmTimeNow(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-}
 
 serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";
