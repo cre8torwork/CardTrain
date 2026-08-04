@@ -1,3 +1,4 @@
+export { detectCardType, CARD_TYPE } from './card-networks';
 import { supabase } from './supabase';
 
 export interface SignedCheckout {
@@ -95,13 +96,6 @@ export async function submitApplePay(orderId: string, token: string, cardType: s
   return { ok: !!d?.ok, message: d?.message ?? d?.error ?? '' };
 }
 
-/** CyberSource card_type code for the networks this MID accepts (Visa 001, Mastercard 002). */
-export function detectCardType(cardNumber: string): string | undefined {
-  const n = cardNumber.replace(/\D/g, '');
-  if (/^4/.test(n)) return '001';
-  if (/^(5[1-5]|2[2-7])/.test(n)) return '002';
-  return undefined;
-}
 
 // ── OAPM (Alipay CN/HK, WeChat Pay) ──
 // Unlike the card + Apple/Google Pay flows, OAPM redirects the browser away to a
