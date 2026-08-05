@@ -15,14 +15,40 @@ export function payTypeForWallet(wallet: OapmWallet): OapmPayType {
 }
 
 /**
- * The Sale `service` value. Known gap (design spec §8 #1): WeChat's WAP value is
+ * Whether EFT has enabled the WeChat H5 (mobile web) product for our sub-merchant.
+ *
+ * Currently FALSE. Probed against the live gateway 2026-08-05: `MobileH5` is
+ * accepted by the Sale API (`return_status: "00"`, a `pay_apptrade` is issued)
+ * but the payment page then fails with
+ *   NO_AUTH: The product of The SubMCHID is not authorized to the partner MCHID
+ * — for BOTH `WECHATCN` and `WECHATHK`, so the wallet code is not the variable.
+ * `service.wechat.web.PreOrder` (Native/QR) on the same merchant works.
+ *
+ * Because the Sale API returns success, this failure is INVISIBLE server-side:
+ * the order is marked `pending` and no payment_event is written. Routing WeChat
+ * WAP to a product we do not own is therefore a silent dead end for the customer.
+ *
+ * Flip to true once EFT enables H5 for the sub-merchant (and whitelists the
+ * calling domain, which WeChat H5 normally also requires). Nothing else changes.
+ */
+const WECHAT_H5_ENTITLED = false;
+
+/**
+ * The Sale `service` value. Known gap (design spec §8 #1): WeChat's H5 value is
  * the irregular `service.wechat.web.MobileH5` — NOT `service.wechat.wap.PreOrder`
  * (EFT's own WeChat-WAP Postman sample defaults `pay_scene` to "WEB" by mistake;
- * this function does not have that bug). Every other combination follows the
- * regular `service.<vendor>.<scene>.PreOrder` pattern.
+ * this function does not have that bug). Confirmed 2026-08-05 as the only H5
+ * string the gateway accepts: `service.wechat.wap.PreOrder`,
+ * `service.wechat.wap.MobileH5`, `service.wechat.app.PreOrder` and
+ * `service.common.MobileH5` all return `-13 Invalid service`.
+ *
+ * WeChat + WAP falls back to Native/QR while WECHAT_H5_ENTITLED is false — see
+ * that constant. Alipay is unaffected: both its scenes are entitled and working.
  */
 export function saleServiceFor(payType: OapmPayType, payScene: OapmPayScene): string {
-  if (payType === 'WeChat' && payScene === 'WAP') return 'service.wechat.web.MobileH5';
+  if (payType === 'WeChat' && payScene === 'WAP') {
+    return WECHAT_H5_ENTITLED ? 'service.wechat.web.MobileH5' : 'service.wechat.web.PreOrder';
+  }
   const vendor = payType === 'Alipay' ? 'alipay' : 'wechat';
   const scene = payScene === 'WAP' ? 'wap' : 'web';
   return `service.${vendor}.${scene}.PreOrder`;

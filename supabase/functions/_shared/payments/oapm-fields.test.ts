@@ -25,11 +25,27 @@ test('saleServiceFor: regular WeChat WEB pattern', () => {
   assert.equal(saleServiceFor('WeChat', 'WEB'), 'service.wechat.web.PreOrder');
 });
 
-test('saleServiceFor: WeChat WAP is the irregular MobileH5 value (known gap #1 regression guard)', () => {
-  assert.equal(saleServiceFor('WeChat', 'WAP'), 'service.wechat.web.MobileH5');
-  // Explicitly not the naive pattern-matched value — this is the bug EFT's own
-  // Postman sample has (defaults pay_scene to "WEB" and never exercises this path).
-  assert.notEqual(saleServiceFor('WeChat', 'WAP'), 'service.wechat.wap.PreOrder');
+test('saleServiceFor: WeChat WAP falls back to Native/QR while H5 is not entitled', () => {
+  // EFT has not enabled the WeChat H5 product for our sub-merchant: MobileH5 is
+  // accepted by the Sale API but the payment page fails NO_AUTH (probed live
+  // 2026-08-05, both WECHATCN and WECHATHK). PreOrder is entitled and works, so
+  // WeChat WAP routes there until WECHAT_H5_ENTITLED flips.
+  assert.equal(saleServiceFor('WeChat', 'WAP'), 'service.wechat.web.PreOrder');
+});
+
+test('saleServiceFor: never emits a service string the gateway rejects', () => {
+  // The Sale API recognises exactly two WeChat services; everything else is
+  // `-13 Invalid service`. Guards every combination against a typo'd product.
+  const VALID_WECHAT = ['service.wechat.web.PreOrder', 'service.wechat.web.MobileH5'];
+  for (const scene of ['WEB', 'WAP'] as const) {
+    assert.ok(
+      VALID_WECHAT.includes(saleServiceFor('WeChat', scene)),
+      `WeChat/${scene} produced an unrecognised service: ${saleServiceFor('WeChat', scene)}`,
+    );
+  }
+  // Alipay is entitled on both scenes and follows the regular pattern.
+  assert.equal(saleServiceFor('Alipay', 'WEB'), 'service.alipay.web.PreOrder');
+  assert.equal(saleServiceFor('Alipay', 'WAP'), 'service.alipay.wap.PreOrder');
 });
 
 test('REFUND_SERVICE defaults to the field-table value, not the docs example value', () => {
