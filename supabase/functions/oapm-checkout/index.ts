@@ -142,10 +142,25 @@ serve(async (req: Request) => {
         actor: "system",
         detail: { gateway: "oapm", stage: "sale_request", reply },
       });
-      // EFT's error text is in return_char (code in return_status) — there is no
-      // `message` field. Surface both so the browser sees the actual reason.
+      // A rejected Sale is a payment DECLINE, not a system error: mark the order
+      // declined (a payable status — the customer can retry) and tell the browser
+      // to route to the failure page, which displays the clear "Transaction
+      // Failed" message EFT's test plan requires — never the raw gateway string.
+      // EFT's error text is in return_char (code in return_status; no `message`
+      // field exists) — kept in the response for logs/debugging only.
+      await supabase
+        .from("orders")
+        .update({
+          status: "declined",
+          gateway: "oapm",
+          oapm_out_trade_no: outTradeNo,
+          oapm_wallet: walletTyped,
+          oapm_pay_scene: effectiveScene,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id);
       const reason = [reply.return_status, reply.return_char].filter(Boolean).join(" ");
-      return json({ error: reason ? `OAPM rejected the payment request: ${reason}` : "OAPM Sale request rejected" }, 502);
+      return json({ declined: true, reason: reason || "OAPM Sale request rejected" }, 200);
     }
 
     await supabase

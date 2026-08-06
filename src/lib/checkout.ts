@@ -106,9 +106,17 @@ export async function submitApplePay(orderId: string, token: string, cardType: s
 export type OapmWallet = 'ALIPAYHK' | 'ALIPAYCN' | 'WECHATCN';
 export type OapmPayScene = 'WEB' | 'WAP';
 
+/** Result of starting an OAPM checkout. When EFT rejects the Sale (e.g. over the
+ *  account's transaction limit) `declined` is true, the order is already marked
+ *  declined server-side, and the UI routes to the failure page; otherwise
+ *  `payApptrade` carries the wallet redirect URL. (A plain interface, not a
+ *  discriminated union — this repo compiles with strictNullChecks off, where
+ *  union narrowing is unreliable.) */
 export interface OapmCheckout {
-  payApptrade: string;
-  outTradeNo: string;
+  declined: boolean;
+  payApptrade?: string;
+  outTradeNo?: string;
+  reason?: string;
 }
 
 /**
@@ -153,9 +161,10 @@ export async function createOapmCheckout(
     body: { orderId, wallet, payScene },
   });
   if (error) throw await oapmErrorFrom(error, 'Failed to start OAPM checkout');
-  const d = data as { payApptrade?: string; outTradeNo?: string; error?: string };
+  const d = data as { declined?: boolean; reason?: string; payApptrade?: string; outTradeNo?: string; error?: string };
+  if (d?.declined) return { declined: true, reason: d.reason ?? '' };
   if (!d?.payApptrade) throw new Error(d?.error || 'Failed to start OAPM checkout');
-  return { payApptrade: d.payApptrade, outTradeNo: d.outTradeNo ?? '' };
+  return { declined: false, payApptrade: d.payApptrade, outTradeNo: d.outTradeNo ?? '' };
 }
 
 /** Poll our own order status (kept current by oapm-notify / oapm-query) after a wallet redirect. */

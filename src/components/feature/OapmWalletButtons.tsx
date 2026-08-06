@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   createOapmCheckout,
@@ -30,6 +31,7 @@ const WALLETS: { id: OapmWallet; labelKey: string; icon: string }[] = [
  */
 export default function OapmWalletButtons({ createOrder, successTo, className }: OapmWalletButtonsProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState<OapmWallet | null>(null);
   const [error, setError] = useState('');
 
@@ -39,9 +41,17 @@ export default function OapmWalletButtons({ createOrder, successTo, className }:
     try {
       const orderId = await createOrder();
       const payScene = detectOapmPayScene();
-      const { payApptrade } = await createOapmCheckout(orderId, wallet, payScene);
+      const result = await createOapmCheckout(orderId, wallet, payScene);
+      if (result.declined || !result.payApptrade) {
+        // EFT rejected the Sale — the order is already marked declined. Enter the
+        // normal result flow so the customer sees the clear "Transaction Failed"
+        // page (EFT test-plan requirement), not a raw gateway error string.
+        rememberOapmPendingOrder({ orderId, successTo });
+        navigate('/oapm-return');
+        return;
+      }
       rememberOapmPendingOrder({ orderId, successTo });
-      window.location.href = payApptrade;
+      window.location.href = result.payApptrade;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(null);
