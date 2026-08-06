@@ -138,7 +138,10 @@ serve(async (req: Request) => {
         actor: "system",
         detail: { gateway: "oapm", stage: "sale_request", reply },
       });
-      return json({ error: reply.message || "OAPM Sale request rejected" }, 502);
+      // EFT's error text is in return_char (code in return_status) — there is no
+      // `message` field. Surface both so the browser sees the actual reason.
+      const reason = [reply.return_status, reply.return_char].filter(Boolean).join(" ");
+      return json({ error: reason ? `OAPM rejected the payment request: ${reason}` : "OAPM Sale request rejected" }, 502);
     }
 
     await supabase

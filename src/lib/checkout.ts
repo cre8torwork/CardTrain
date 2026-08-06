@@ -116,6 +116,26 @@ export function detectOapmPayScene(): OapmPayScene {
   return /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'WAP' : 'WEB';
 }
 
+/**
+ * supabase-js collapses any function error into the generic "Edge Function
+ * returned a non-2xx status code" and discards the response body — where our
+ * functions put the actual reason (EFT's rejection message, "order not payable",
+ * etc.). Pull the real message out of error.context (a Response) so the UI can
+ * show something actionable instead of the opaque generic.
+ */
+async function oapmErrorFrom(error: unknown, fallback: string): Promise<Error> {
+  const ctx = (error as { context?: Response }).context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = (await ctx.json()) as { error?: string };
+      if (body?.error) return new Error(body.error);
+    } catch {
+      // unreadable body — fall through to the generic message
+    }
+  }
+  return error instanceof Error ? error : new Error(fallback);
+}
+
 /** Server-signs and submits the OAPM Sale request; returns the wallet redirect URL. */
 export async function createOapmCheckout(
   orderId: string,
@@ -125,7 +145,7 @@ export async function createOapmCheckout(
   const { data, error } = await supabase.functions.invoke('oapm-checkout', {
     body: { orderId, wallet, payScene },
   });
-  if (error) throw error;
+  if (error) throw await oapmErrorFrom(error, 'Failed to start OAPM checkout');
   const d = data as { payApptrade?: string; outTradeNo?: string; error?: string };
   if (!d?.payApptrade) throw new Error(d?.error || 'Failed to start OAPM checkout');
   return { payApptrade: d.payApptrade, outTradeNo: d.outTradeNo ?? '' };
@@ -136,7 +156,7 @@ export async function queryOapmOrder(orderId: string): Promise<{ status: string;
   const { data, error } = await supabase.functions.invoke('oapm-query', {
     body: { orderId },
   });
-  if (error) throw error;
+  if (error) throw await oapmErrorFrom(error, 'Failed to check order status');
   const d = data as { status?: string; eftTradeNo?: string | null; error?: string };
   if (!d?.status) throw new Error(d?.error || 'Failed to check order status');
   return { status: d.status, eftTradeNo: d.eftTradeNo ?? null };
