@@ -120,6 +120,11 @@ serve(async (req: Request) => {
       pay_scene: effectiveScene,
       notify_url: `${SUPABASE_URL}/functions/v1/oapm-notify`,
       return_url: `${SITE_URL}/oapm-return`,
+      // Payment-link validity. EFT's default is 1800s (30 min); 5 minutes is
+      // enough for any real top-up and lets an abandoned/cancelled payment reach
+      // its terminal TRADE_CLOSED quickly — which the return page polls for, and
+      // which the EFT test plan's timeout fail case requires us to display.
+      active_time: "300",
       time: oapmTimeNow(),
     };
     fields.sign = await signOapmFields(fields, OAPM_SECRET);

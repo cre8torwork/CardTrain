@@ -17,8 +17,15 @@ import { consumeOapmPendingOrder, queryOapmOrder } from '../../lib/checkout';
 // be trustworthy, not just presence) — polling oapm-query is correct and safe as
 // is; this would only be a latency improvement, not a correctness fix.
 
-const POLL_INTERVAL_MS = 3000;
-const MAX_POLLS = 10; // ~30s — covers the common "notify already landed" case
+// Fast polls cover the common "notify already landed" case; slow polls then
+// keep watching until just past the payment link's 5-minute validity
+// (oapm-checkout sends active_time=300), so an abandoned or cancelled payment
+// resolves to its terminal TRADE_CLOSED → the clear "Transaction Failed" view —
+// on screen, without the customer having to refresh (EFT timeout fail case).
+const FAST_POLL_MS = 3000;
+const FAST_POLLS = 10; // 30s
+const SLOW_POLL_MS = 10000;
+const MAX_POLLS = FAST_POLLS + 33; // 30s fast + ~5.5min slow ≈ just past link expiry
 
 type Phase = 'checking' | 'paid' | 'declined' | 'pending' | 'missing';
 
@@ -42,6 +49,8 @@ export default function OapmReturnPage() {
     let cancelled = false;
     let attempts = 0;
 
+    const nextDelay = () => (attempts < FAST_POLLS ? FAST_POLL_MS : SLOW_POLL_MS);
+
     const poll = async () => {
       attempts += 1;
       try {
@@ -51,11 +60,11 @@ export default function OapmReturnPage() {
         if (status === 'paid') return setPhase('paid');
         if (status === 'declined' || status === 'error') return setPhase('declined');
         if (attempts >= MAX_POLLS) return setPhase('pending');
-        setTimeout(poll, POLL_INTERVAL_MS);
+        setTimeout(poll, nextDelay());
       } catch {
         if (cancelled) return;
         if (attempts >= MAX_POLLS) setPhase('pending');
-        else setTimeout(poll, POLL_INTERVAL_MS);
+        else setTimeout(poll, nextDelay());
       }
     };
     poll();
