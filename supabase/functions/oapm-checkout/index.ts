@@ -27,10 +27,10 @@ import {
   saleServiceFor,
   payTypeForWallet,
   buyerTypeFromUserAgent,
+  effectiveOapmPayScene,
   oapmTimeNow,
   VALID_OAPM_WALLETS,
   type OapmWallet,
-  type OapmPayScene,
 } from "../_shared/payments/oapm-fields.ts";
 import { formatMinorUnits } from "../_shared/payments/money.ts";
 import { corsHeaders } from "../_shared/payments/cors.ts";
@@ -78,9 +78,13 @@ serve(async (req: Request) => {
     if (!VALID_OAPM_WALLETS.includes(wallet as OapmWallet)) {
       return json({ error: "invalid wallet" }, 400);
     }
-    if (payScene !== "WEB" && payScene !== "WAP") {
+    if (payScene !== undefined && payScene !== "WEB" && payScene !== "WAP") {
       return json({ error: "invalid payScene" }, 400);
     }
+    // A mobile customer must ALWAYS get the app-redirect (H5) flow, even when the
+    // browser-side detection fails (stale cached bundle, desktop-mode UA) — so the
+    // wire scene is WAP if either the client or the server-seen UA says mobile.
+    const effectiveScene = effectiveOapmPayScene(payScene, req.headers.get("user-agent") || "");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -98,7 +102,7 @@ serve(async (req: Request) => {
 
     const walletTyped = wallet as OapmWallet;
     const payType = payTypeForWallet(walletTyped);
-    const service = saleServiceFor(payType, payScene as OapmPayScene);
+    const service = saleServiceFor(payType, effectiveScene);
     const buyerType = buyerTypeFromUserAgent(req.headers.get("user-agent") || "");
     const outTradeNo = outTradeNoFor(order.id);
     const subject =
@@ -113,7 +117,7 @@ serve(async (req: Request) => {
       buyerType,
       subject,
       wallet: walletTyped,
-      pay_scene: payScene as string,
+      pay_scene: effectiveScene,
       notify_url: `${SUPABASE_URL}/functions/v1/oapm-notify`,
       return_url: `${SITE_URL}/oapm-return`,
       time: oapmTimeNow(),
@@ -151,7 +155,7 @@ serve(async (req: Request) => {
         gateway: "oapm",
         oapm_out_trade_no: outTradeNo,
         oapm_wallet: walletTyped,
-        oapm_pay_scene: payScene,
+        oapm_pay_scene: effectiveScene,
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
@@ -164,7 +168,7 @@ serve(async (req: Request) => {
         gateway: "oapm",
         service,
         wallet: walletTyped,
-        pay_scene: payScene,
+        pay_scene: effectiveScene,
         eft_trade_no: reply.eft_trade_no ?? null,
       },
     });

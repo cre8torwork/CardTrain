@@ -5,6 +5,7 @@ import {
   saleServiceFor,
   buyerTypeFromUserAgent,
   paySceneFromUserAgent,
+  effectiveOapmPayScene,
   oapmTimeNow,
   REFUND_SERVICE,
   VALID_OAPM_WALLETS,
@@ -83,6 +84,23 @@ test('paySceneFromUserAgent: mobile UAs get WAP, desktop UAs get WEB', () => {
 
 test('VALID_OAPM_WALLETS lists exactly the three wallets in scope (WECHATHK excluded — open question §9)', () => {
   assert.deepEqual([...VALID_OAPM_WALLETS].sort(), ['ALIPAYCN', 'ALIPAYHK', 'WECHATCN']);
+});
+
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+const IPAD_DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15'; // iPadOS masquerading as Mac
+
+test('effectiveOapmPayScene: WAP if EITHER the client or the UA says mobile (2026-08-06 QR-on-mobile regression guard)', () => {
+  // Normal phone: both agree.
+  assert.equal(effectiveOapmPayScene('WAP', IPHONE_UA), 'WAP');
+  // Stale/buggy client bundle sent WEB from a phone — the UA must still force WAP.
+  assert.equal(effectiveOapmPayScene('WEB', IPHONE_UA), 'WAP');
+  assert.equal(effectiveOapmPayScene(undefined, IPHONE_UA), 'WAP');
+  // iPad masquerading as a desktop Mac: only the client (touch detection) knows — its WAP vote wins.
+  assert.equal(effectiveOapmPayScene('WAP', IPAD_DESKTOP_UA), 'WAP');
+  // Real desktop stays WEB.
+  assert.equal(effectiveOapmPayScene('WEB', DESKTOP_UA), 'WEB');
+  assert.equal(effectiveOapmPayScene(undefined, DESKTOP_UA), 'WEB');
 });
 
 test('oapmTimeNow is Beijing/HK time (UTC+8), not UTC — regression guard for the 2026-08-04 rejection bug', () => {

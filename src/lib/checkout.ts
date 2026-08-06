@@ -111,9 +111,16 @@ export interface OapmCheckout {
   outTradeNo: string;
 }
 
-/** WEB vs WAP — user-agent sniffing, the design spec's default (§9 open Q3). */
+/**
+ * WEB vs WAP — user-agent sniffing plus a touch-points check for iPadOS (and
+ * "Request Desktop Website" Safari), whose UA reports a desktop Mac. The server
+ * independently re-derives this from the UA and takes the union (WAP if either
+ * side says mobile), so a stale bundle can't strand a phone on the QR flow.
+ */
 export function detectOapmPayScene(): OapmPayScene {
-  return /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'WAP' : 'WEB';
+  if (/mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent)) return 'WAP';
+  if (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1) return 'WAP';
+  return 'WEB';
 }
 
 /**

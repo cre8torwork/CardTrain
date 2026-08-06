@@ -76,6 +76,24 @@ export function paySceneFromUserAgent(userAgent: string): OapmPayScene {
 }
 
 /**
+ * The scene actually sent to EFT — WAP if EITHER the client's detection or the
+ * server-seen User-Agent says mobile. Added 2026-08-06 after a real phone got
+ * the QR (WEB) flow for WeChat: the browser-side detection can silently fail
+ * (stale cached bundle, or iPadOS / "Request Desktop Website" Safari whose UA
+ * reports a desktop Mac), and a mobile customer must ALWAYS get the app
+ * redirect (MobileH5 for WeChat). A real desktop browser never carries a
+ * mobile UA, so the union can't wrongly force WAP on desktop — while the
+ * client's vote still wins for devices only it can recognise as touch (iPad
+ * masquerading as Mac, once the front end checks maxTouchPoints).
+ */
+export function effectiveOapmPayScene(
+  clientScene: string | undefined,
+  userAgent: string,
+): OapmPayScene {
+  return clientScene === 'WAP' || paySceneFromUserAgent(userAgent) === 'WAP' ? 'WAP' : 'WEB';
+}
+
+/**
  * `time` field, format yyyyMMddHHmmss — BUG FIX 2026-08-04: must be Beijing/HK
  * time (UTC+8), not UTC. EFT's docs don't state a timezone, so this originally
  * defaulted to UTC (documented as a guess in the design spec) — but EFT's own
