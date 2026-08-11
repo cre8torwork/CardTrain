@@ -1,5 +1,6 @@
 export { detectCardType, CARD_TYPE } from './card-networks';
 import { supabase } from './supabase';
+import { edgeErrorMessage } from './edge-error';
 
 export interface SignedCheckout {
   endpoint: string;
@@ -11,7 +12,7 @@ export async function createBuyPointsOrder(packageId: string, quantity: number):
   const { data, error } = await supabase.functions.invoke('create-order', {
     body: { packageId, quantity },
   });
-  if (error) throw error;
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to create order'));
   const orderId = (data as { orderId?: string })?.orderId;
   if (!orderId) throw new Error((data as { error?: string })?.error || 'Failed to create order');
   return orderId;
@@ -22,7 +23,7 @@ export async function createCustomPointsOrder(ctp: number): Promise<string> {
   const { data, error } = await supabase.functions.invoke('create-order', {
     body: { kind: 'buy_points_custom', ctp },
   });
-  if (error) throw error;
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to create order'));
   const orderId = (data as { orderId?: string })?.orderId;
   if (!orderId) throw new Error((data as { error?: string })?.error || 'Failed to create order');
   return orderId;
@@ -46,7 +47,7 @@ export async function createShopCardOrder(
   const { data, error } = await supabase.functions.invoke('create-order', {
     body: { kind: 'shop_goods', items, shipping },
   });
-  if (error) throw error;
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to create order'));
   const orderId = (data as { orderId?: string })?.orderId;
   if (!orderId) throw new Error((data as { error?: string })?.error || 'Failed to create order');
   return orderId;
@@ -70,7 +71,9 @@ export async function signCheckout(
   const { data, error } = await supabase.functions.invoke('sign-checkout', {
     body: { orderId, network },
   });
-  if (error) throw error;
+  // A non-2xx here carries a real reason (e.g. "UnionPay is not configured…").
+  // supabase-js hides it behind a generic message — surface the actual one.
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to sign checkout'));
   const d = data as { endpoint?: string; fields?: Record<string, string>; error?: string };
   if (!d?.endpoint || !d?.fields) throw new Error(d?.error || 'Failed to sign checkout');
   return { endpoint: d.endpoint, fields: d.fields };
@@ -144,25 +147,6 @@ export function detectOapmPayScene(): OapmPayScene {
   return 'WEB';
 }
 
-/**
- * supabase-js collapses any function error into the generic "Edge Function
- * returned a non-2xx status code" and discards the response body — where our
- * functions put the actual reason (EFT's rejection message, "order not payable",
- * etc.). Pull the real message out of error.context (a Response) so the UI can
- * show something actionable instead of the opaque generic.
- */
-async function oapmErrorFrom(error: unknown, fallback: string): Promise<Error> {
-  const ctx = (error as { context?: Response }).context;
-  if (ctx && typeof ctx.json === 'function') {
-    try {
-      const body = (await ctx.json()) as { error?: string };
-      if (body?.error) return new Error(body.error);
-    } catch {
-      // unreadable body — fall through to the generic message
-    }
-  }
-  return error instanceof Error ? error : new Error(fallback);
-}
 
 /** Server-signs and submits the OAPM Sale request; returns the wallet redirect URL. */
 export async function createOapmCheckout(
@@ -173,7 +157,7 @@ export async function createOapmCheckout(
   const { data, error } = await supabase.functions.invoke('oapm-checkout', {
     body: { orderId, wallet, payScene },
   });
-  if (error) throw await oapmErrorFrom(error, 'Failed to start OAPM checkout');
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to start OAPM checkout'));
   const d = data as { declined?: boolean; reason?: string; payApptrade?: string; outTradeNo?: string; error?: string };
   if (d?.declined) return { declined: true, reason: d.reason ?? '' };
   if (!d?.payApptrade) throw new Error(d?.error || 'Failed to start OAPM checkout');
@@ -185,7 +169,7 @@ export async function queryOapmOrder(orderId: string): Promise<{ status: string;
   const { data, error } = await supabase.functions.invoke('oapm-query', {
     body: { orderId },
   });
-  if (error) throw await oapmErrorFrom(error, 'Failed to check order status');
+  if (error) throw new Error(await edgeErrorMessage(error, 'Failed to check order status'));
   const d = data as { status?: string; eftTradeNo?: string | null; error?: string };
   if (!d?.status) throw new Error(d?.error || 'Failed to check order status');
   return { status: d.status, eftTradeNo: d.eftTradeNo ?? null };
