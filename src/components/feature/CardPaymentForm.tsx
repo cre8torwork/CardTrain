@@ -1,10 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { detectCardType, type SignedCheckout } from '../../lib/checkout';
+import { detectCardType, type SignedCheckout, type CardNetworkChoice } from '../../lib/checkout';
 import SecureBadges from './SecureBadges';
 
 interface CardPaymentFormProps extends SignedCheckout {
   amountLabel: string; // e.g. "HK$ 300"
+  /**
+   * Which merchant this form was signed for. The card typed MUST belong to that
+   * network — submitting a Visa card against the UnionPay merchant (or vice
+   * versa) is rejected with reason_code 102, which creates no transaction and so
+   * cannot be traced in the Business Center. Catch it here instead.
+   */
+  network?: CardNetworkChoice;
   /** Name of the iframe to post into, so the top-level page never navigates away. */
   target?: string;
   /** Called once validation passes and the native cross-origin POST is about to fire. */
@@ -28,7 +35,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0
  * so card data never touches our servers. On submit the browser leaves for
  * CyberSource, which returns to our checkout-response receipt endpoint.
  */
-export default function CardPaymentForm({ endpoint, fields, amountLabel, target, onSubmitted }: CardPaymentFormProps) {
+export default function CardPaymentForm({ endpoint, fields, amountLabel, target, onSubmitted, network = 'visa' }: CardPaymentFormProps) {
   const { t } = useTranslation();
   const [number, setNumber] = useState('');
   const [month, setMonth] = useState('');
@@ -37,13 +44,15 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
   const [error, setError] = useState('');
 
   const digits = cardDigits(number);
-  const cardType = detectCardType(digits) ?? '';
+  const cardType = detectCardType(digits, { unionPay: network === 'unionpay' }) ?? '';
+  // 062 is UnionPay; 001/002 are Visa/Mastercard. Must match the signed merchant.
+  const matchesNetwork = network === 'unionpay' ? cardType === '062' : cardType === '001' || cardType === '002';
   const expiry = month && year ? `${month}-${year}` : ''; // CyberSource wants MM-yyyy
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    if (!cardType) {
+    if (!cardType || !matchesNetwork) {
       e.preventDefault();
-      setError(t('buyPoints.cardUnsupported'));
+      setError(t(network === 'unionpay' ? 'buyPoints.cardNotUnionPay' : 'buyPoints.cardUnsupported'));
       return;
     }
     if (!expiry || cvn.length < 3) {
@@ -76,7 +85,7 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
         <input
           inputMode="numeric"
           autoComplete="cc-number"
-          placeholder="4000 0000 0000 0000"
+          placeholder={network === 'unionpay' ? '6210 0000 0000 0000' : '4000 0000 0000 0000'}
           value={number}
           maxLength={23} // 19 digits + 4 grouping spaces
           onChange={(e) => { setNumber(formatCardNumber(e.target.value)); setError(''); }}

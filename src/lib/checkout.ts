@@ -52,10 +52,23 @@ export async function createShopCardOrder(
   return orderId;
 }
 
-/** Get the server-signed Secure Acceptance field set for an order. */
-export async function signCheckout(orderId: string): Promise<SignedCheckout> {
+/** Card networks the customer chooses between — they are on DIFFERENT merchant IDs. */
+export type CardNetworkChoice = 'visa' | 'unionpay';
+
+/**
+ * Get the server-signed Secure Acceptance field set for an order.
+ *
+ * `network` selects the merchant account: Visa/Mastercard live on MID …200 and
+ * UnionPay on …204, each with its own Secure Acceptance profile and keys. The
+ * server signs with the matching profile and records that MID on the order, so
+ * refunds route back through the merchant that took the payment.
+ */
+export async function signCheckout(
+  orderId: string,
+  network: CardNetworkChoice = 'visa',
+): Promise<SignedCheckout> {
   const { data, error } = await supabase.functions.invoke('sign-checkout', {
-    body: { orderId },
+    body: { orderId, network },
   });
   if (error) throw error;
   const d = data as { endpoint?: string; fields?: Record<string, string>; error?: string };

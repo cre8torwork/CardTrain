@@ -14,12 +14,10 @@ import { buildSignedRequestFields } from "../_shared/payments/secure-acceptance.
 import { formatMinorUnits } from "../_shared/payments/money.ts";
 import { corsHeaders } from "../_shared/payments/cors.ts";
 import { transactionTypeFor } from "../_shared/payments/order-kind.ts";
+import { merchantForNetwork, type CardNetwork } from "../_shared/payments/merchants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SA_PROFILE_ID = Deno.env.get("CYBS_SA_PROFILE_ID")!;
-const SA_ACCESS_KEY = Deno.env.get("CYBS_SA_ACCESS_KEY")!;
-const SA_SECRET_KEY = Deno.env.get("CYBS_SA_SECRET_KEY")!;
 // test: https://testsecureacceptance.cybersource.com/silent/pay
 // live: https://secureacceptance.cybersource.com/silent/pay
 const SA_ENDPOINT = Deno.env.get("CYBS_SA_ENDPOINT")!;
@@ -49,7 +47,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { orderId } = await req.json();
+    const { orderId, network } = await req.json() as { orderId?: string; network?: CardNetwork };
     if (!orderId) {
       return new Response(JSON.stringify({ error: "missing orderId" }), {
         status: 400,
@@ -92,11 +90,24 @@ serve(async (req: Request) => {
       email: authUser?.user?.email ?? "",
     };
 
+    // Visa/Mastercard and UnionPay are on DIFFERENT merchant accounts, each with
+    // its own Secure Acceptance profile + keys. Pick the right one, or fail loudly
+    // rather than sign a card against a merchant that cannot process it.
+    let merchant;
+    try {
+      merchant = merchantForNetwork(network ?? "visa", Deno.env.toObject());
+    } catch (e) {
+      return new Response(JSON.stringify({ error: (e as Error).message }), {
+        status: 503,
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      });
+    }
+
     const referenceNumber = newReferenceNumber();
     const fields = await buildSignedRequestFields(
       {
-        accessKey: SA_ACCESS_KEY,
-        profileId: SA_PROFILE_ID,
+        accessKey: merchant.accessKey,
+        profileId: merchant.profileId,
         transactionUuid: crypto.randomUUID(),
         signedDateTime: signedDateTimeNow(),
         locale: "en",
@@ -107,19 +118,31 @@ serve(async (req: Request) => {
         paymentMethod: "card",
         billTo,
       },
-      SA_SECRET_KEY,
+      merchant.secretKey,
     );
 
     await supabase
       .from("orders")
-      .update({ status: "pending", reference_number: referenceNumber, updated_at: new Date().toISOString() })
+      .update({
+        status: "pending",
+        reference_number: referenceNumber,
+        // Record WHICH merchant took it — refunds and every follow-on must route
+        // back through the same MID.
+        mid: merchant.merchantId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", order.id);
     await supabase.from("payment_events").insert({
       order_id: order.id,
       type: "sign",
       amount_minor: order.amount_minor,
       actor: "system",
-      detail: { reference_number: referenceNumber, transaction_type: fields.transaction_type },
+      detail: {
+        reference_number: referenceNumber,
+        transaction_type: fields.transaction_type,
+        network: network ?? "visa",
+        mid: merchant.merchantId,
+      },
     });
 
     return new Response(JSON.stringify({ endpoint: SA_ENDPOINT, fields }), {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/hooks/useShopStore';
 import { placeShopOrder } from '@/hooks/useShopStore';
-import { createShopCardOrder, signCheckout } from '@/lib/checkout';
+import { createShopCardOrder } from '@/lib/checkout';
 import OapmWalletButtons from '@/components/feature/OapmWalletButtons';
 
 interface ShopCheckoutModalProps {
@@ -110,12 +110,10 @@ export default function ShopCheckoutModal({
         cartItems.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
         form,
       );
-      const signed = await signCheckout(orderId);
-      // Hand off to the in-site /checkout page (card entry + 3DS happen there).
+      // Hand off to /checkout; signing happens there once the network is picked.
       navigate('/checkout', {
         state: {
           orderId,
-          checkout: signed,
           amountMinor: hkdTotalMinor,
           amountLabel: hkdTotalLabel,
           lines: cartItems.map((i) => ({

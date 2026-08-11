@@ -1094,6 +1094,9 @@ const translation = {
   "user.redeemDescNaked": "Naked card redemption: {nakedCount} Pokémon TCG cards × {ptPerCard} CTP",
   "user.redeemFail": "Redemption failed",
   "user.nakedCardAlt": "Pokémon TCG Naked Card",
+  "checkout.choosePaymentCard": "Choose your card",
+  "checkout.visaMastercard": "Visa / Mastercard",
+  "checkout.unionPay": "UnionPay",
 };
 
 export default translation;

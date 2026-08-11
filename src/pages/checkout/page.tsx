@@ -6,7 +6,7 @@ import SiteFooter from '../../components/feature/SiteFooter';
 import CardPaymentFrame, { type PaymentOutcome } from '../../components/feature/CardPaymentFrame';
 import ApplePayButton from '../../components/feature/ApplePayButton';
 import GooglePayButton from '../../components/feature/GooglePayButton';
-import type { SignedCheckout } from '../../lib/checkout';
+import { signCheckout, type SignedCheckout, type CardNetworkChoice } from '../../lib/checkout';
 
 // In-site checkout page. Both Buy Points and the shop card flow navigate here with
 // a server-signed order; card entry, 3-D Secure and the confirmation all happen on
@@ -22,7 +22,8 @@ const WALLETS_ENABLED = import.meta.env.VITE_ENABLE_WALLETS === 'true';
 
 export interface CheckoutState {
   orderId: string;
-  checkout: SignedCheckout;
+  /** Optional: pre-signed fields. Omitted now — we sign once the network is picked. */
+  checkout?: SignedCheckout;
   amountMinor: number;
   amountLabel: string;
   lines: { label: string; value: string }[];
@@ -34,6 +35,27 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const state = (useLocation().state ?? null) as CheckoutState | null;
   const [outcome, setOutcome] = useState<PaymentOutcome | null>(null);
+  // Visa/Mastercard and UnionPay are separate merchant accounts, so the customer
+  // picks first and we sign against that merchant only.
+  const [network, setNetwork] = useState<CardNetworkChoice | null>(null);
+  const [signed, setSigned] = useState<SignedCheckout | null>(state?.checkout ?? null);
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState('');
+
+  const chooseNetwork = async (n: CardNetworkChoice) => {
+    setNetwork(n);
+    setSignError('');
+    if (!state) return;
+    setSigning(true);
+    try {
+      setSigned(await signCheckout(state.orderId, n));
+    } catch (e) {
+      setSigned(null);
+      setSignError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSigning(false);
+    }
+  };
 
   const orderId = state?.orderId;
   const reuseOrder = useCallback(() => Promise.resolve(orderId!), [orderId]);
@@ -107,12 +129,57 @@ export default function CheckoutPage() {
             </div>
           ) : (
             <>
-              <CardPaymentFrame
-                endpoint={state.checkout.endpoint}
-                fields={state.checkout.fields}
-                amountLabel={state.amountLabel}
-                onOutcome={setOutcome}
-              />
+              {/* Visa/Mastercard and UnionPay are separate CyberSource merchant
+                  accounts (…200 and …204), so the customer chooses first and we
+                  sign against that merchant only. */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2">{t('checkout.choosePaymentCard')}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: 'visa' as const, label: t('checkout.visaMastercard'), icons: ['ri-visa-line text-blue-600', 'ri-mastercard-line text-red-500'] },
+                    { id: 'unionpay' as const, label: t('checkout.unionPay'), icons: ['ri-bank-card-2-line text-blue-500'] },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => chooseNetwork(opt.id)}
+                      disabled={signing}
+                      className={`px-3 py-3 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60 ${
+                        network === opt.id
+                          ? 'border-rose-400 bg-rose-50 text-rose-600'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5 text-lg mb-1">
+                        {opt.icons.map((c) => <i key={c} className={c}></i>)}
+                      </span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {signing && (
+                <p className="flex items-center justify-center gap-2 text-sm text-gray-500 py-2">
+                  <i className="ri-loader-4-line animate-spin"></i>{t('buyPoints.preparingPayment')}
+                </p>
+              )}
+
+              {signError && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                  <i className="ri-error-warning-line flex-shrink-0"></i>{signError}
+                </div>
+              )}
+
+              {signed && !signing && (
+                <CardPaymentFrame
+                  endpoint={signed.endpoint}
+                  fields={signed.fields}
+                  amountLabel={state.amountLabel}
+                  network={network ?? 'visa'}
+                  onOutcome={setOutcome}
+                />
+              )}
 
               {WALLETS_ENABLED && (
                 <>

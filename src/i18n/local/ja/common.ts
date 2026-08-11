@@ -1094,6 +1094,9 @@ const translation = {
   "user.redeemDescNaked": "裸カード交換：{nakedCount} 枚の Pokémon TCG × {ptPerCard} CTP",
   "user.redeemFail": "交換失敗",
   "user.nakedCardAlt": "Pokémon TCG 裸カード",
+  "checkout.choosePaymentCard": "カードの種類を選択",
+  "checkout.visaMastercard": "Visa / Mastercard",
+  "checkout.unionPay": "銀聯 (UnionPay)",
 };
 
 export default translation;

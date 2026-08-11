@@ -75,6 +75,7 @@ const translation = {
   "buyPoints.ctpPlaceholder": "例: 750",
   "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 1〜999,990 CTP の整数を入力してください",
   "buyPoints.customCtpLabel": "カスタム CTP",
+  "buyPoints.cardNotUnionPay": "銀聯カードを入力するか、戻って Visa / Mastercard を選択してください。",
 };
 
 export default translation;

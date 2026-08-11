@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CardPaymentForm from './CardPaymentForm';
 import { EDGE_FUNCTIONS } from '../../lib/edgeFunctions';
-import type { SignedCheckout } from '../../lib/checkout';
+import type { SignedCheckout, CardNetworkChoice } from '../../lib/checkout';
 
 // Keeps the whole card checkout inside the site: the Secure Acceptance form posts
 // into a same-page iframe instead of navigating the top-level window. CyberSource
@@ -21,10 +21,12 @@ export interface PaymentOutcome {
 
 interface CardPaymentFrameProps extends SignedCheckout {
   amountLabel: string;
+  /** The merchant/network these fields were signed for. */
+  network?: CardNetworkChoice;
   onOutcome: (outcome: PaymentOutcome) => void;
 }
 
-export default function CardPaymentFrame({ endpoint, fields, amountLabel, onOutcome }: CardPaymentFrameProps) {
+export default function CardPaymentFrame({ endpoint, fields, amountLabel, network, onOutcome }: CardPaymentFrameProps) {
   const { t } = useTranslation();
   const [processing, setProcessing] = useState(false);
 
@@ -66,6 +68,7 @@ export default function CardPaymentFrame({ endpoint, fields, amountLabel, onOutc
           endpoint={endpoint}
           fields={fields}
           amountLabel={amountLabel}
+          network={network}
           target={FRAME_NAME}
           onSubmitted={() => setProcessing(true)}
         />

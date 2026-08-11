@@ -5,7 +5,7 @@ import { useUserAuth } from '../../hooks/useUserAuth';
 import { usePointsStore } from '../../hooks/usePointsStore';
 import SiteHeader from '../../components/feature/SiteHeader';
 import SiteFooter from '../../components/feature/SiteFooter';
-import { createBuyPointsOrder, createCustomPointsOrder, signCheckout } from '../../lib/checkout';
+import { createBuyPointsOrder, createCustomPointsOrder } from '../../lib/checkout';
 import OapmWalletButtons from '../../components/feature/OapmWalletButtons';
 
 interface PointsPackage {
@@ -131,11 +131,11 @@ export default function BuyPointsPage() {
       } else {
         throw new Error('No selection');
       }
-      const signed = await signCheckout(orderId);
+      // Signing now happens on /checkout, once the customer picks Visa/MC vs
+      // UnionPay — they are different merchant accounts.
       navigate('/checkout', {
         state: {
           orderId,
-          checkout: signed,
           amountMinor: Math.round(totalHKD * 100),
           amountLabel: `HK$ ${formatHkd(totalHKD)}`,
           lines: [

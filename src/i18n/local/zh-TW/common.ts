@@ -1094,6 +1094,9 @@ const translation = {
   "user.redeemDescNaked": "裸卡換分：{nakedCount} 張 Pokémon TCG 裸卡 × {ptPerCard} CTP",
   "user.redeemFail": "換分失敗",
   "user.nakedCardAlt": "Pokémon TCG 裸卡",
+  "checkout.choosePaymentCard": "選擇您的卡種",
+  "checkout.visaMastercard": "Visa / Mastercard",
+  "checkout.unionPay": "銀聯",
 };
 
 export default translation;

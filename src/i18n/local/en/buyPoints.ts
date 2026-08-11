@@ -75,6 +75,7 @@ const translation = {
   "buyPoints.ctpPlaceholder": "e.g. 750",
   "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; Enter a whole number from 1 to 999,990 CTP",
   "buyPoints.customCtpLabel": "Custom CTP",
+  "buyPoints.cardNotUnionPay": "Please enter a China UnionPay card, or go back and choose Visa / Mastercard.",
 };
 
 export default translation;

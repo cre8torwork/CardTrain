@@ -1,0 +1,71 @@
+// Which CyberSource merchant account (and therefore which Secure Acceptance
+// profile + keys) processes a given card network.
+//
+// Card Train has TWO card merchant IDs:
+//   gphk088034609200 — Visa + Mastercard   (CYBS_SA_*)
+//   gphk088034609204 — China UnionPay      (CYBS_SA_CUP_*)
+//
+// A Secure Acceptance profile belongs to one merchant ID, so each MID has its own
+// Profile ID / Access Key / Secret Key. Signing a card with the WRONG merchant's
+// profile is rejected with reason_code 102 ("This card is not supported by the
+// processor.: card_type") — and because 102 is a validation reject, CyberSource
+// creates no transaction, so it cannot even be traced in the Business Center.
+// That is why an unidentified network falls back to the default merchant and a
+// missing UnionPay configuration throws loudly instead of quietly mis-routing.
+//
+// The MID that took the payment is recorded on the order: refunds and every other
+// follow-on MUST go back through the same merchant.
+
+export const CARD_NETWORK = {
+  visa: "visa",
+  mastercard: "mastercard",
+  unionPay: "unionpay",
+} as const;
+
+export type CardNetwork = (typeof CARD_NETWORK)[keyof typeof CARD_NETWORK];
+
+export interface Merchant {
+  merchantId: string;
+  profileId: string;
+  accessKey: string;
+  secretKey: string;
+}
+
+/** Env lookup, injectable so this is testable without Deno. */
+export type EnvMap = Record<string, string | undefined>;
+
+const DEFAULT_CARDS_MID = "gphk088034609200";
+const UNIONPAY_MID = "gphk088034609204";
+
+/** CyberSource card_type code -> network. Unknown codes use the default merchant. */
+export function networkForCardType(cardType: string): CardNetwork {
+  if (cardType === "002") return CARD_NETWORK.mastercard;
+  if (cardType === "062") return CARD_NETWORK.unionPay;
+  return CARD_NETWORK.visa; // 001 and anything unrecognised
+}
+
+export function merchantForNetwork(network: CardNetwork, env: EnvMap): Merchant {
+  if (network === CARD_NETWORK.unionPay) {
+    const profileId = env.CYBS_SA_CUP_PROFILE_ID ?? "";
+    const accessKey = env.CYBS_SA_CUP_ACCESS_KEY ?? "";
+    const secretKey = env.CYBS_SA_CUP_SECRET_KEY ?? "";
+    if (!profileId || !accessKey || !secretKey) {
+      throw new Error(
+        "UnionPay is not configured: set CYBS_SA_CUP_PROFILE_ID / _ACCESS_KEY / _SECRET_KEY " +
+          `for MID ${UNIONPAY_MID}`,
+      );
+    }
+    return {
+      merchantId: env.CYBS_SA_CUP_MERCHANT_ID || UNIONPAY_MID,
+      profileId,
+      accessKey,
+      secretKey,
+    };
+  }
+  return {
+    merchantId: env.CYBS_SA_MERCHANT_ID || DEFAULT_CARDS_MID,
+    profileId: env.CYBS_SA_PROFILE_ID ?? "",
+    accessKey: env.CYBS_SA_ACCESS_KEY ?? "",
+    secretKey: env.CYBS_SA_SECRET_KEY ?? "",
+  };
+}

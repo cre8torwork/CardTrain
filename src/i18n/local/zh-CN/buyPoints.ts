@@ -75,6 +75,7 @@ const translation = {
   "buyPoints.ctpPlaceholder": "例如 750",
   "buyPoints.ctpHint": "HK$1 = 10 CTP &middot; 请输入 1 至 999,990 之间的整数 CTP",
   "buyPoints.customCtpLabel": "自定义 CTP",
+  "buyPoints.cardNotUnionPay": "请输入银联卡，或返回选择 Visa / Mastercard。",
 };
 
 export default translation;
