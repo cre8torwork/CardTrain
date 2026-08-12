@@ -34,6 +34,25 @@ function signedDateTimeNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+/**
+ * Reuse a shop order's delivery address as the billing address.
+ *
+ * Only shop_goods orders capture one (create-order stores it at
+ * metadata.shipping); Buy Points orders have no address anywhere, which is why
+ * the browser has to collect it for UnionPay. All three parts or none.
+ */
+function billingAddressFrom(
+  metadata: unknown,
+): { addressLine1?: string; city?: string; country?: string } {
+  const s = (metadata as { shipping?: Record<string, string> } | null)?.shipping;
+  if (!s) return {};
+  const line1 = [s.flatFloor, s.building, s.address].map((p) => (p ?? "").trim())
+    .filter(Boolean).join(", ");
+  const city = (s.district ?? "").trim() || "Hong Kong";
+  if (!line1) return {};
+  return { addressLine1: line1.slice(0, 60), city: city.slice(0, 50), country: "HK" };
+}
+
 serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";
   if (req.method === "OPTIONS") {
@@ -60,7 +79,7 @@ serve(async (req: Request) => {
     // Re-derive the amount from our own order — never sign an amount the browser sent.
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, user_id, kind, amount_minor, currency, status")
+      .select("id, user_id, kind, amount_minor, currency, status, metadata")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -88,6 +107,7 @@ serve(async (req: Request) => {
       forename: forename || "Card",
       surname: rest.join(" ") || "Holder",
       email: authUser?.user?.email ?? "",
+      ...billingAddressFrom(order.metadata),
     };
 
     // Visa/Mastercard and UnionPay are on DIFFERENT merchant accounts, each with
@@ -117,6 +137,10 @@ serve(async (req: Request) => {
         currency: order.currency,
         paymentMethod: "card",
         billTo,
+        // UnionPay's profile is Hosted Checkout, which mandates a billing
+        // address. When the order carries none, let the form collect it rather
+        // than lose the authorization to reason_code 101.
+        requireBillingAddress: (network ?? "visa") === "unionpay",
       },
       merchant.secretKey,
     );

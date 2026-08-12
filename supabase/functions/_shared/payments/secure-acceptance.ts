@@ -14,6 +14,25 @@ const enc = new TextEncoder();
 /** Fields whose values the customer types in the browser; never signed, never server-side. */
 export const UNSIGNED_FIELD_NAMES = 'card_type,card_number,card_expiry_date,card_cvn';
 
+/**
+ * Billing-address fields, in signing order.
+ *
+ * The UnionPay merchant (…204) runs a HOSTED CHECKOUT Secure Acceptance profile,
+ * whose own payment page collects a billing address and therefore makes it
+ * mandatory. Posting to the Checkout API endpoint (/silent/pay) against that
+ * profile skips the page but NOT the requirement, so the authorization is
+ * rejected with reason_code 101 naming `bill_address1, bill_city, bill_country`.
+ * Those are the internal Simple Order names — which is why grepping the codebase
+ * for them finds nothing; we send the `bill_to_address_*` spellings below.
+ * Visa/Mastercard (…200) is a Checkout API profile and never required them,
+ * which is why that network worked from the start.
+ */
+export const BILLING_ADDRESS_FIELD_NAMES = [
+  'bill_to_address_line1',
+  'bill_to_address_city',
+  'bill_to_address_country',
+] as const;
+
 /** The signed fields, in the exact order they are signed. */
 const SIGNED_FIELD_NAMES = [
   'access_key',
@@ -45,7 +64,25 @@ export interface SignedRequestInput {
   currency: string; // "HKD"
   paymentMethod: string; // "card"
   // Required for card transactions; known server-side for a logged-in user.
-  billTo: { forename: string; surname: string; email: string };
+  // The address parts are only known for orders that captured one (shop goods);
+  // supply all three or none — a partial address is worse than none, because
+  // CyberSource then reports a different missing field on every attempt.
+  billTo: {
+    forename: string;
+    surname: string;
+    email: string;
+    addressLine1?: string;
+    city?: string;
+    country?: string; // ISO 3166-1 alpha-2, e.g. "HK"
+  };
+  /**
+   * The merchant's profile makes a billing address mandatory (UnionPay/…204).
+   * When we have no address to sign, the three fields are declared UNSIGNED so
+   * the browser form can collect them — an unsigned field is still covered by
+   * the signature, because `unsigned_field_names` is itself signed, so a
+   * customer can add an address but cannot add a field we did not allow.
+   */
+  requireBillingAddress?: boolean;
 }
 
 /** Build the exact string that gets HMAC-signed, in signed_field_names order. */
@@ -74,12 +111,27 @@ export async function buildSignedRequestFields(
   input: SignedRequestInput,
   secretKey: string,
 ): Promise<Record<string, string>> {
+  // All three, or none: sign the address when the order carries one, otherwise
+  // let the browser supply it (only when the profile actually demands it).
+  const address = {
+    bill_to_address_line1: input.billTo.addressLine1?.trim() ?? '',
+    bill_to_address_city: input.billTo.city?.trim() ?? '',
+    bill_to_address_country: input.billTo.country?.trim() ?? '',
+  };
+  const haveAddress = BILLING_ADDRESS_FIELD_NAMES.every((n) => address[n]);
+  const signedNames = haveAddress
+    ? [...SIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES]
+    : [...SIGNED_FIELD_NAMES];
+  const unsignedNames = !haveAddress && input.requireBillingAddress
+    ? [UNSIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES].join(',')
+    : UNSIGNED_FIELD_NAMES;
+
   const fields: Record<string, string> = {
     access_key: input.accessKey,
     profile_id: input.profileId,
     transaction_uuid: input.transactionUuid,
-    signed_field_names: SIGNED_FIELD_NAMES.join(','),
-    unsigned_field_names: UNSIGNED_FIELD_NAMES,
+    signed_field_names: signedNames.join(','),
+    unsigned_field_names: unsignedNames,
     signed_date_time: input.signedDateTime,
     locale: input.locale,
     transaction_type: input.transactionType,
@@ -90,6 +142,7 @@ export async function buildSignedRequestFields(
     bill_to_forename: input.billTo.forename,
     bill_to_surname: input.billTo.surname,
     bill_to_email: input.billTo.email,
+    ...(haveAddress ? address : {}),
   };
   fields.signature = await hmacSha256Base64(secretKey, buildDataToSign(fields));
   return fields;

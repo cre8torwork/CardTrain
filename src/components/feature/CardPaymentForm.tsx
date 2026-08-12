@@ -25,6 +25,17 @@ const cardDigits = (v: string) => v.replace(/\D/g, '').slice(0, 19);
 const formatCardNumber = (v: string) =>
   cardDigits(v).replace(/(.{4})/g, '$1 ').trim();
 
+/**
+ * Countries offered for the billing address. UnionPay's Secure Acceptance
+ * profile is Hosted Checkout and makes the billing address mandatory; CyberSource
+ * wants an ISO 3166-1 alpha-2 code, not a name.
+ */
+const BILLING_COUNTRIES: [code: string, name: string][] = [
+  ['HK', 'Hong Kong 香港'], ['CN', 'China 中國'], ['MO', 'Macau 澳門'], ['TW', 'Taiwan 台灣'],
+  ['SG', 'Singapore'], ['MY', 'Malaysia'], ['JP', 'Japan 日本'], ['GB', 'United Kingdom'],
+  ['US', 'United States'], ['AU', 'Australia'], ['CA', 'Canada'],
+];
+
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 11 }, (_, i) => String(CURRENT_YEAR + i));
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -42,6 +53,16 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
   const [year, setYear] = useState('');
   const [cvn, setCvn] = useState('');
   const [error, setError] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('HK');
+
+  // The server decides whether the browser must supply a billing address: it
+  // signs the address itself when the order carries one, and otherwise names the
+  // fields in unsigned_field_names. Following that instead of re-deriving it from
+  // `network` keeps one source of truth — and unsigned_field_names is signed, so
+  // it cannot be tampered with.
+  const needsBillingAddress = (fields.unsigned_field_names ?? '').includes('bill_to_address_line1');
 
   const digits = cardDigits(number);
   const cardType = detectCardType(digits, { unionPay: network === 'unionpay' }) ?? '';
@@ -58,6 +79,14 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
     if (!expiry || cvn.length < 3) {
       e.preventDefault();
       setError(t('buyPoints.cardIncomplete'));
+      return;
+    }
+    // Catch a blank billing address here: CyberSource would otherwise take the
+    // customer through 3-D Secure first and only then reject the authorization
+    // with reason_code 101 — a wasted authentication and a confusing failure.
+    if (needsBillingAddress && (!addressLine1.trim() || !city.trim() || !country)) {
+      e.preventDefault();
+      setError(t('buyPoints.billingAddressIncomplete'));
       return;
     }
     // Otherwise allow the native cross-origin POST to CyberSource (into `target`).
@@ -122,6 +151,48 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
           />
         </div>
       </div>
+
+      {needsBillingAddress && (
+        <div className="space-y-3 pt-1">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingAddress')}</label>
+            <input
+              name="bill_to_address_line1"
+              autoComplete="billing street-address"
+              maxLength={60}
+              value={addressLine1}
+              onChange={(e) => { setAddressLine1(e.target.value); setError(''); }}
+              className={input}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCity')}</label>
+              <input
+                name="bill_to_address_city"
+                autoComplete="billing address-level2"
+                maxLength={50}
+                value={city}
+                onChange={(e) => { setCity(e.target.value); setError(''); }}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCountry')}</label>
+              <select
+                name="bill_to_address_country"
+                value={country}
+                onChange={(e) => { setCountry(e.target.value); setError(''); }}
+                className={`${input} cursor-pointer`}
+              >
+                {BILLING_COUNTRIES.map(([code, name]) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">

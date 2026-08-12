@@ -80,3 +80,67 @@ test('verifyResponseSignature rejects a wrong secret key', async () => {
   const fields = await buildSignedRequestFields(baseInput, SECRET);
   assert.equal(await verifyResponseSignature(fields, 'wrong_secret'), false);
 });
+
+// ── Billing address (UnionPay / Hosted Checkout profile) ──
+// The …204 profile is Hosted Checkout, so CyberSource rejects an authorization
+// without a billing address: reason_code 101, missingField [bill_address1,
+// bill_city, bill_country]. …200 is a Checkout API profile and must NOT start
+// sending these — an empty signed field is a new way to fail.
+
+const ADDRESS = { addressLine1: '1 Queens Road Central', city: 'Hong Kong', country: 'HK' };
+
+test('a Visa/Mastercard sign is unchanged — no billing-address fields at all', async () => {
+  const fields = await buildSignedRequestFields(baseInput, SECRET);
+  for (const n of ['bill_to_address_line1', 'bill_to_address_city', 'bill_to_address_country']) {
+    assert.ok(!fields.signed_field_names.includes(n), `${n} must not be signed`);
+    assert.ok(!fields.unsigned_field_names.includes(n), `${n} must not be unsigned`);
+    assert.equal(fields[n], undefined);
+  }
+});
+
+test('an order that carries an address signs it, and still verifies', async () => {
+  const fields = await buildSignedRequestFields(
+    { ...baseInput, billTo: { ...baseInput.billTo, ...ADDRESS } },
+    SECRET,
+  );
+  assert.equal(fields.bill_to_address_line1, '1 Queens Road Central');
+  assert.equal(fields.bill_to_address_city, 'Hong Kong');
+  assert.equal(fields.bill_to_address_country, 'HK');
+  assert.ok(fields.signed_field_names.endsWith('bill_to_address_line1,bill_to_address_city,bill_to_address_country'));
+  // Signed, so it cannot be swapped in flight.
+  assert.ok(!fields.unsigned_field_names.includes('bill_to_address_line1'));
+  assert.equal(await verifyResponseSignature(fields, SECRET), true);
+});
+
+test('UnionPay with no stored address declares the fields UNSIGNED so the form collects them', async () => {
+  const fields = await buildSignedRequestFields({ ...baseInput, requireBillingAddress: true }, SECRET);
+  for (const n of ['bill_to_address_line1', 'bill_to_address_city', 'bill_to_address_country']) {
+    assert.ok(fields.unsigned_field_names.includes(n), `${n} must be unsigned`);
+    assert.ok(!fields.signed_field_names.includes(n), `${n} must not also be signed`);
+  }
+  // Card fields must survive alongside them.
+  assert.ok(fields.unsigned_field_names.startsWith('card_type,card_number,card_expiry_date,card_cvn'));
+  // unsigned_field_names is itself signed, so the browser cannot widen the set.
+  assert.ok(fields.signed_field_names.includes('unsigned_field_names'));
+  assert.equal(await verifyResponseSignature(fields, SECRET), true);
+});
+
+test('a stored address wins over the browser even when UnionPay asks for one', async () => {
+  const fields = await buildSignedRequestFields(
+    { ...baseInput, requireBillingAddress: true, billTo: { ...baseInput.billTo, ...ADDRESS } },
+    SECRET,
+  );
+  assert.ok(!fields.unsigned_field_names.includes('bill_to_address_line1'));
+  assert.ok(fields.signed_field_names.includes('bill_to_address_line1'));
+});
+
+test('a PARTIAL address is dropped, never half-signed', async () => {
+  // Signing an empty bill_to_address_city just moves the 101 to a different
+  // field; falling back to browser collection actually fixes it.
+  const fields = await buildSignedRequestFields(
+    { ...baseInput, requireBillingAddress: true, billTo: { ...baseInput.billTo, addressLine1: 'x', city: '  ' } },
+    SECRET,
+  );
+  assert.ok(!fields.signed_field_names.includes('bill_to_address_line1'));
+  assert.ok(fields.unsigned_field_names.includes('bill_to_address_line1'));
+});
