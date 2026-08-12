@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { merchantForNetwork, networkForCardType, CARD_NETWORK } from './merchants.ts';
+import { merchantForNetwork, networkForCardType, merchantForProfileId, configuredMerchants, CARD_NETWORK } from './merchants.ts';
 
 const ENV = {
   CYBS_SA_PROFILE_ID: 'profile-200',
@@ -56,4 +56,25 @@ test('UnionPay without configured credentials throws — never silently bills th
 test('the default merchant id falls back to the known cards MID if unset', () => {
   const m = merchantForNetwork(CARD_NETWORK.visa, { ...ENV, CYBS_SA_MERCHANT_ID: '' });
   assert.equal(m.merchantId, 'gphk088034609200');
+});
+
+test('a response is matched back to its merchant by req_profile_id', () => {
+  // checkout-response must verify the signature with the SAME secret CyberSource
+  // signed with. Verifying a UnionPay response with the …200 secret fails and the
+  // customer sees "We could not verify this transaction" after paying.
+  assert.equal(merchantForProfileId('profile-204', ENV)?.merchantId, 'gphk088034609204');
+  assert.equal(merchantForProfileId('profile-200', ENV)?.merchantId, 'gphk088034609200');
+  assert.equal(merchantForProfileId('unknown-profile', ENV), null);
+});
+
+test('configuredMerchants lists every merchant that has credentials', () => {
+  assert.deepEqual(configuredMerchants(ENV).map((m) => m.merchantId).sort(), [
+    'gphk088034609200',
+    'gphk088034609204',
+  ]);
+  // UnionPay unconfigured -> only the default merchant, and no throw.
+  assert.deepEqual(
+    configuredMerchants({ ...ENV, CYBS_SA_CUP_SECRET_KEY: '' }).map((m) => m.merchantId),
+    ['gphk088034609200'],
+  );
 });

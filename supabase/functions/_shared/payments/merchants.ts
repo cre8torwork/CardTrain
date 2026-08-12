@@ -69,3 +69,39 @@ export function merchantForNetwork(network: CardNetwork, env: EnvMap): Merchant 
     secretKey: env.CYBS_SA_SECRET_KEY ?? "",
   };
 }
+
+/** Every merchant that actually has credentials configured. Never throws. */
+export function configuredMerchants(env: EnvMap): Merchant[] {
+  const out: Merchant[] = [];
+  if (env.CYBS_SA_PROFILE_ID && env.CYBS_SA_SECRET_KEY) {
+    out.push({
+      merchantId: env.CYBS_SA_MERCHANT_ID || DEFAULT_CARDS_MID,
+      profileId: env.CYBS_SA_PROFILE_ID,
+      accessKey: env.CYBS_SA_ACCESS_KEY ?? "",
+      secretKey: env.CYBS_SA_SECRET_KEY,
+    });
+  }
+  if (env.CYBS_SA_CUP_PROFILE_ID && env.CYBS_SA_CUP_SECRET_KEY) {
+    out.push({
+      merchantId: env.CYBS_SA_CUP_MERCHANT_ID || UNIONPAY_MID,
+      profileId: env.CYBS_SA_CUP_PROFILE_ID,
+      accessKey: env.CYBS_SA_CUP_ACCESS_KEY ?? "",
+      secretKey: env.CYBS_SA_CUP_SECRET_KEY,
+    });
+  }
+  return out;
+}
+
+/**
+ * Match an inbound CyberSource response back to the merchant that signed it,
+ * using `req_profile_id` from the response.
+ *
+ * checkout-response MUST verify with the same secret CyberSource signed with.
+ * Verifying a UnionPay response against the …200 secret fails, and the customer
+ * is told "We could not verify this transaction" AFTER their card was charged —
+ * the money moves but the order never completes.
+ */
+export function merchantForProfileId(profileId: string, env: EnvMap): Merchant | null {
+  if (!profileId) return null;
+  return configuredMerchants(env).find((m) => m.profileId === profileId) ?? null;
+}

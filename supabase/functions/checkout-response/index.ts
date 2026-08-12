@@ -13,10 +13,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verifyResponseSignature } from "../_shared/payments/secure-acceptance.ts";
 import { confirmationFor } from "../_shared/payments/reason-codes.ts";
 import { isPointsPurchase, paidStatusFor } from "../_shared/payments/order-kind.ts";
+import { merchantForProfileId, configuredMerchants } from "../_shared/payments/merchants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SA_SECRET_KEY = Deno.env.get("CYBS_SA_SECRET_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://cardtrain.com";
 
 const escapeHtml = (s: string) =>
@@ -113,7 +113,28 @@ serve(async (req: Request) => {
     const fields: Record<string, string> = {};
     new URLSearchParams(raw).forEach((v, k) => (fields[k] = v));
 
-    if (!(await verifyResponseSignature(fields, SA_SECRET_KEY))) {
+    // Verify with the key that SIGNED this response. Visa/Mastercard (…200) and
+    // UnionPay (…204) are separate merchants with separate secrets — verifying a
+    // UnionPay response against the …200 secret fails, and the customer is told
+    // the transaction could not be verified AFTER their card was charged.
+    const env = Deno.env.toObject();
+    const byProfile = merchantForProfileId(fields.req_profile_id ?? "", env);
+    // Prefer the profile named in the response; fall back to trying each
+    // configured merchant so a missing/renamed profile id still verifies.
+    const candidates = byProfile ? [byProfile] : configuredMerchants(env);
+
+    let verifiedWith: string | null = null;
+    for (const m of candidates) {
+      if (await verifyResponseSignature(fields, m.secretKey)) {
+        verifiedWith = m.merchantId;
+        break;
+      }
+    }
+    if (!verifiedWith) {
+      console.error(
+        "[checkout-response] signature verification FAILED",
+        { req_profile_id: fields.req_profile_id, tried: candidates.map((m) => m.merchantId) },
+      );
       return htmlResponse(
         confirmationPage("retry", "We could not verify this transaction. Please try again."),
         400,
