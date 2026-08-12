@@ -67,6 +67,22 @@ function confirmationPage(category: string, message: string, referenceNumber = "
 </div>${bridge}</body></html>`;
 }
 
+
+/**
+ * CyberSource names the offending fields in the response as missingField_0..N
+ * (reason 101) and invalidField_0..N (reason 102). Without these, a 101/102 is
+ * untraceable — you know something is wrong but not what. Capture them.
+ */
+function fieldProblems(fields: Record<string, string>): { missing: string[]; invalid: string[] } {
+  const pick = (prefix: string) =>
+    Object.keys(fields)
+      .filter((k) => k.startsWith(prefix))
+      .sort()
+      .map((k) => fields[k])
+      .filter(Boolean);
+  return { missing: pick("missingField_"), invalid: pick("invalidField_") };
+}
+
 const htmlResponse = (body: string, status: number) =>
   new Response(body, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 
@@ -145,6 +161,16 @@ serve(async (req: Request) => {
     const reasonCode = Number(fields.reason_code);
     const transactionId = fields.transaction_id ?? "";
     const confirmation = confirmationFor(reasonCode, referenceNumber);
+    const problems = fieldProblems(fields);
+    if (reasonCode !== 100) {
+      console.error("[checkout-response] declined", {
+        reasonCode,
+        referenceNumber,
+        message: fields.message,
+        missing: problems.missing,
+        invalid: problems.invalid,
+      });
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: order } = await supabase
@@ -160,7 +186,15 @@ serve(async (req: Request) => {
         amount_minor: order.amount_minor,
         reason_code: reasonCode,
         actor: "system",
-        detail: { decision: fields.decision, transaction_id: transactionId },
+        detail: {
+          decision: fields.decision,
+          transaction_id: transactionId,
+          message: fields.message ?? "",
+          // reason 101 -> missing, 102 -> invalid. Recording these is the
+          // difference between a diagnosable failure and a guessing game.
+          ...(problems.missing.length ? { missing_fields: problems.missing } : {}),
+          ...(problems.invalid.length ? { invalid_fields: problems.invalid } : {}),
+        },
       });
 
       if (reasonCode === 100) {
