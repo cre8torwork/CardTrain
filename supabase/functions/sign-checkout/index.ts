@@ -146,10 +146,12 @@ serve(async (req: Request) => {
         currency: order.currency,
         paymentMethod: "card",
         billTo,
-        // Only meaningful for Checkout API. Under Hosted Checkout CyberSource
-        // collects the address on its own page, so nothing is declared unsigned.
-        requireBillingAddress: merchant.integration === "checkout_api" &&
-          (network ?? "visa") === "unionpay",
+        // The …204 profile mandates a billing address under BOTH integrations.
+        // Hosted Checkout collects the card on CyberSource's page but NOT the
+        // address, so the browser still has to supply one when the order carries
+        // none — otherwise the authorization dies at reason_code 101
+        // [bill_address1, bill_city, bill_country].
+        requireBillingAddress: (network ?? "visa") === "unionpay",
         integration: merchant.integration,
       },
       merchant.secretKey,

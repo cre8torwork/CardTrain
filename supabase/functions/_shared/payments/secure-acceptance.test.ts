@@ -150,13 +150,30 @@ test('a PARTIAL address is dropped, never half-signed', async () => {
 // unsigned_field_names must be PRESENT in the POST, so declaring card fields we
 // will never send makes the gateway answer 403 on every endpoint.
 
-test('hosted declares NO unsigned fields at all', async () => {
+test('hosted never declares card fields — CyberSource collects the card', async () => {
   const f = await buildSignedRequestFields(
     { ...baseInput, integration: 'hosted', requireBillingAddress: true },
     SECRET,
   );
+  assert.equal(f.unsigned_field_names.includes('card_number'), false);
+  assert.equal(f.unsigned_field_names.includes('card_cvn'), false);
+});
+
+test('hosted STILL asks the browser for a billing address when the order has none', async () => {
+  // The …204 hosted payment page renders card fields only, but the profile
+  // mandates an address: sending none fails the authorization with reason_code
+  // 101 [bill_address1, bill_city, bill_country] AFTER 3-D Secure has run.
+  const f = await buildSignedRequestFields(
+    { ...baseInput, integration: 'hosted', requireBillingAddress: true },
+    SECRET,
+  );
+  assert.equal(f.unsigned_field_names, 'bill_to_address_line1,bill_to_address_city,bill_to_address_country');
+  assert.equal(await verifyResponseSignature(f, SECRET), true);
+});
+
+test('hosted declares nothing unsigned when the profile does not demand an address', async () => {
+  const f = await buildSignedRequestFields({ ...baseInput, integration: 'hosted' }, SECRET);
   assert.equal(f.unsigned_field_names, '');
-  assert.equal(f.signed_field_names.includes('bill_to_address_line1'), false);
 });
 
 test('hosted still signs an address the order already carries (prefills the hosted page)', async () => {

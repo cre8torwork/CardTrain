@@ -104,15 +104,70 @@ export default function CardPaymentForm({ endpoint, fields, integration, amountL
 
   const input = 'w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent';
 
-  // Hosted Checkout: hand the signed set straight over and let CyberSource collect
-  // the card. Nothing to validate here — there are no inputs to validate.
+  const billingAddressBlock = (
+    <div className="space-y-3 pt-1">
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingAddress')}</label>
+        <input
+          name="bill_to_address_line1"
+          autoComplete="billing street-address"
+          maxLength={60}
+          value={addressLine1}
+          onChange={(e) => { setAddressLine1(e.target.value); setError(''); }}
+          className={input}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCity')}</label>
+          <input
+            name="bill_to_address_city"
+            autoComplete="billing address-level2"
+            maxLength={50}
+            value={city}
+            onChange={(e) => { setCity(e.target.value); setError(''); }}
+            className={input}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCountry')}</label>
+          <select
+            name="bill_to_address_country"
+            value={country}
+            onChange={(e) => { setCountry(e.target.value); setError(''); }}
+            className={`${input} cursor-pointer`}
+          >
+            {BILLING_COUNTRIES.map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Hosted Checkout: CyberSource collects the CARD on its own page, so we render
+  // no card inputs. It does NOT collect a billing address though, and the …204
+  // profile mandates one — without it the authorization fails at reason_code 101
+  // [bill_address1, bill_city, bill_country] AFTER 3-D Secure has already run. So
+  // we still collect the address here when the signer declared those fields
+  // unsigned, and block submit while it is blank rather than burn an
+  // authentication the customer will lose anyway.
   if (integration === 'hosted') {
+    const handleHostedSubmit = (e: FormEvent<HTMLFormElement>) => {
+      if (needsBillingAddress && (!addressLine1.trim() || !city.trim() || !country)) {
+        e.preventDefault();
+        setError(t('buyPoints.billingAddressIncomplete'));
+        return;
+      }
+      onSubmitted?.();
+    };
     return (
       <form
         method="POST"
         action={endpoint}
         target={target}
-        onSubmit={() => onSubmitted?.()}
+        onSubmit={handleHostedSubmit}
         className="space-y-3 text-left"
       >
         {Object.entries(fields).map(([k, v]) => (
@@ -123,6 +178,14 @@ export default function CardPaymentForm({ endpoint, fields, integration, amountL
           <i className="ri-bank-card-2-line text-blue-500 flex-shrink-0 mt-0.5"></i>
           {t('buyPoints.hostedCardNote')}
         </p>
+
+        {needsBillingAddress && billingAddressBlock}
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+            <i className="ri-error-warning-line flex-shrink-0"></i>{error}
+          </div>
+        )}
 
         {/* 3-D Secure programme marks, close to the CHECKOUT button (GPAP requirement) */}
         <SecureBadges className="pt-1" />
@@ -199,47 +262,7 @@ export default function CardPaymentForm({ endpoint, fields, integration, amountL
         </div>
       </div>
 
-      {needsBillingAddress && (
-        <div className="space-y-3 pt-1">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingAddress')}</label>
-            <input
-              name="bill_to_address_line1"
-              autoComplete="billing street-address"
-              maxLength={60}
-              value={addressLine1}
-              onChange={(e) => { setAddressLine1(e.target.value); setError(''); }}
-              className={input}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCity')}</label>
-              <input
-                name="bill_to_address_city"
-                autoComplete="billing address-level2"
-                maxLength={50}
-                value={city}
-                onChange={(e) => { setCity(e.target.value); setError(''); }}
-                className={input}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">{t('buyPoints.billingCountry')}</label>
-              <select
-                name="bill_to_address_country"
-                value={country}
-                onChange={(e) => { setCountry(e.target.value); setError(''); }}
-                className={`${input} cursor-pointer`}
-              >
-                {BILLING_COUNTRIES.map(([code, name]) => (
-                  <option key={code} value={code}>{name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
+      {needsBillingAddress && billingAddressBlock}
 
       {error && (
         <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">

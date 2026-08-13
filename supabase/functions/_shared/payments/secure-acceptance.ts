@@ -139,11 +139,17 @@ export async function buildSignedRequestFields(
   const signedNames = haveAddress
     ? [...SIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES]
     : [...SIGNED_FIELD_NAMES];
-  // Hosted Checkout collects the card (and any missing address) on CyberSource's
-  // own page, so nothing is left for the browser to add — declare no unsigned
-  // fields rather than naming fields that will never be sent.
+  // Hosted Checkout collects the CARD on CyberSource's own page, so we never
+  // declare card fields for it. It does NOT collect a billing address, though —
+  // the …204 hosted payment page renders card fields only, while the profile
+  // still mandates an address, so sending none fails the authorization with
+  // reason_code 101 [bill_address1, bill_city, bill_country]. When the order
+  // carries no address we therefore declare those three UNSIGNED under hosted
+  // too, and our own form collects them before the handoff.
   const unsignedNames = hosted
-    ? ''
+    ? (!haveAddress && input.requireBillingAddress
+      ? BILLING_ADDRESS_FIELD_NAMES.join(',')
+      : '')
     : !haveAddress && input.requireBillingAddress
     ? [UNSIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES].join(',')
     : UNSIGNED_FIELD_NAMES;
