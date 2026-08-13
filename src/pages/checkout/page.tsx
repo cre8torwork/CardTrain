@@ -175,6 +175,7 @@ export default function CheckoutPage() {
                 <CardPaymentFrame
                   endpoint={signed.endpoint}
                   fields={signed.fields}
+                  integration={signed.integration}
                   amountLabel={state.amountLabel}
                   network={network ?? 'visa'}
                   onOutcome={setOutcome}
@@ -193,9 +194,13 @@ export default function CheckoutPage() {
                 </>
               )}
 
+              {/* Under Hosted Checkout the card is typed on CyberSource's own page
+                  (rendered inside our iframe, so the top-level page still never
+                  navigates). Saying it is entered "on this page" would be wrong,
+                  and GPAP reviews this wording. */}
               <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400 text-center">
                 <i className="ri-shield-check-line text-emerald-500"></i>
-                {t('checkout.onSiteNote')}
+                {t(signed?.integration === 'hosted' ? 'checkout.onSiteNoteHosted' : 'checkout.onSiteNote')}
               </p>
             </>
           )}

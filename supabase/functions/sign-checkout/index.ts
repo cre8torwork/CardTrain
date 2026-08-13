@@ -1,12 +1,16 @@
-// sign-checkout — server-side signing for CyberSource Secure Acceptance
-// (Checkout API / Silent Order POST). The browser POSTs the returned `fields`
-// (plus the card fields the customer types) directly to CyberSource; card data
-// never touches this server.
+// sign-checkout — server-side signing for CyberSource Secure Acceptance. Card data
+// never touches this server under either integration:
 //
-// ⚠️ PENDING SANDBOX VERIFICATION: the signing logic is unit-tested
-// (_shared/payments/secure-acceptance.test.ts), but an end-to-end run needs the
-// real Secure Acceptance credentials (Profile ID / Access Key / Secret Key) from
-// EBC2 — not yet in hand. Do not treat a green deploy as a passed transaction.
+//   Visa/Mastercard (…200) — Checkout API / Silent Order POST. The browser POSTs the
+//     returned `fields` plus the card fields the customer typed straight to
+//     CyberSource.
+//   UnionPay (…204)        — Hosted Checkout. The browser POSTs only the signed
+//     `fields`; CyberSource collects the card on its own page. GPAP requires this
+//     merchant to use Hosted Checkout, which EBC records per transaction as the
+//     "Client Application".
+//
+// `integration` in the response tells the browser which of the two it is holding,
+// so the form knows whether to render card inputs at all.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -18,9 +22,14 @@ import { merchantForNetwork, type CardNetwork } from "../_shared/payments/mercha
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// test: https://testsecureacceptance.cybersource.com/silent/pay
-// live: https://secureacceptance.cybersource.com/silent/pay
-const SA_ENDPOINT = Deno.env.get("CYBS_SA_ENDPOINT")!;
+// CYBS_SA_ENDPOINT is the Checkout API (Silent Order POST) URL:
+//   test: https://testsecureacceptance.cybersource.com/silent/pay
+//   live: https://secureacceptance.cybersource.com/silent/pay
+// It is no longer shared across merchants. CyberSource stamps the integration onto
+// every transaction as the Business Center "Client Application", and GPAP requires
+// UnionPay to read "Secure Acceptance Hosted Checkout" — handing both networks this
+// one endpoint is exactly what made UnionPay read "Secure Acceptance SOP". Each
+// merchant now carries its own endpoint (see merchants.ts).
 
 // A new, unique reference_number on EVERY request — including retries of the same
 // order (GPAP requirement). Double-charge protection lives in the order state
@@ -137,10 +146,11 @@ serve(async (req: Request) => {
         currency: order.currency,
         paymentMethod: "card",
         billTo,
-        // UnionPay's profile is Hosted Checkout, which mandates a billing
-        // address. When the order carries none, let the form collect it rather
-        // than lose the authorization to reason_code 101.
-        requireBillingAddress: (network ?? "visa") === "unionpay",
+        // Only meaningful for Checkout API. Under Hosted Checkout CyberSource
+        // collects the address on its own page, so nothing is declared unsigned.
+        requireBillingAddress: merchant.integration === "checkout_api" &&
+          (network ?? "visa") === "unionpay",
+        integration: merchant.integration,
       },
       merchant.secretKey,
     );
@@ -166,13 +176,23 @@ serve(async (req: Request) => {
         transaction_type: fields.transaction_type,
         network: network ?? "visa",
         mid: merchant.merchantId,
+        // Recorded so a transaction can be traced back to the Client Application
+        // EBC will show against it — the thing GPAP reviews.
+        integration: merchant.integration,
       },
     });
 
-    return new Response(JSON.stringify({ endpoint: SA_ENDPOINT, fields }), {
-      status: 200,
-      headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        endpoint: merchant.endpoint,
+        integration: merchant.integration,
+        fields,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+      },
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,

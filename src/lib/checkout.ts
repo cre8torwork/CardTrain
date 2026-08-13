@@ -2,9 +2,20 @@ export { detectCardType, CARD_TYPE } from './card-networks';
 import { supabase } from './supabase';
 import { edgeErrorMessage } from './edge-error';
 
+/**
+ * Which Secure Acceptance integration the server signed for.
+ *
+ * `checkout_api` — we render the card fields and they post straight to CyberSource.
+ * `hosted`       — CyberSource renders its own payment page; we must NOT send card
+ *                  fields. UnionPay runs this way because GPAP requires its
+ *                  transactions to be logged as Hosted Checkout.
+ */
+export type Integration = 'checkout_api' | 'hosted';
+
 export interface SignedCheckout {
   endpoint: string;
   fields: Record<string, string>;
+  integration: Integration;
 }
 
 /** Create a Buy Points order server-side (amount derived from the package, not the client). */
@@ -74,9 +85,16 @@ export async function signCheckout(
   // A non-2xx here carries a real reason (e.g. "UnionPay is not configured…").
   // supabase-js hides it behind a generic message — surface the actual one.
   if (error) throw new Error(await edgeErrorMessage(error, 'Failed to sign checkout'));
-  const d = data as { endpoint?: string; fields?: Record<string, string>; error?: string };
+  const d = data as {
+    endpoint?: string;
+    fields?: Record<string, string>;
+    integration?: Integration;
+    error?: string;
+  };
   if (!d?.endpoint || !d?.fields) throw new Error(d?.error || 'Failed to sign checkout');
-  return { endpoint: d.endpoint, fields: d.fields };
+  // Fall back to checkout_api so a browser holding a newer bundle than the deployed
+  // function still renders the card fields that endpoint expects.
+  return { endpoint: d.endpoint, fields: d.fields, integration: d.integration ?? 'checkout_api' };
 }
 
 /** Submit a Google Pay token for an order. Backend is pending the wallet certs. */

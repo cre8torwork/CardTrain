@@ -24,11 +24,35 @@ export const CARD_NETWORK = {
 
 export type CardNetwork = (typeof CARD_NETWORK)[keyof typeof CARD_NETWORK];
 
+/**
+ * Which Secure Acceptance integration drives a profile. This is NOT a style
+ * choice — CyberSource records it against every transaction as the "Client
+ * Application" in the Business Center, and GPAP requires UnionPay to read
+ * "Secure Acceptance Hosted Checkout", not "Secure Acceptance SOP".
+ *
+ * The endpoint IS the method:
+ *   checkout_api -> /silent/pay  we collect the card; it posts straight to CyberSource
+ *   hosted       -> /pay         CyberSource collects the card on its own page
+ */
+export type Integration = "checkout_api" | "hosted";
+
 export interface Merchant {
   merchantId: string;
   profileId: string;
   accessKey: string;
   secretKey: string;
+  /** Where this merchant's signed form must be POSTed. */
+  endpoint: string;
+  integration: Integration;
+}
+
+/**
+ * Both integrations sit on the same host and differ only by path, so the hosted
+ * endpoint is derived rather than requiring a second env var to be set correctly on
+ * every deployment. An explicit CYBS_SA_CUP_ENDPOINT still wins.
+ */
+export function hostedEndpointFrom(checkoutApiEndpoint: string): string {
+  return checkoutApiEndpoint.replace(/\/silent\/pay\/?$/, "/pay");
 }
 
 /** Env lookup, injectable so this is testable without Deno. */
@@ -45,6 +69,7 @@ export function networkForCardType(cardType: string): CardNetwork {
 }
 
 export function merchantForNetwork(network: CardNetwork, env: EnvMap): Merchant {
+  const checkoutApiEndpoint = env.CYBS_SA_ENDPOINT ?? "";
   if (network === CARD_NETWORK.unionPay) {
     const profileId = env.CYBS_SA_CUP_PROFILE_ID ?? "";
     const accessKey = env.CYBS_SA_CUP_ACCESS_KEY ?? "";
@@ -60,6 +85,10 @@ export function merchantForNetwork(network: CardNetwork, env: EnvMap): Merchant 
       profileId,
       accessKey,
       secretKey,
+      // GPAP requires this merchant to run Hosted Checkout. Sharing the Visa/MC
+      // endpoint is what made EBC log it as "Secure Acceptance SOP".
+      endpoint: env.CYBS_SA_CUP_ENDPOINT || hostedEndpointFrom(checkoutApiEndpoint),
+      integration: "hosted",
     };
   }
   return {
@@ -67,11 +96,14 @@ export function merchantForNetwork(network: CardNetwork, env: EnvMap): Merchant 
     profileId: env.CYBS_SA_PROFILE_ID ?? "",
     accessKey: env.CYBS_SA_ACCESS_KEY ?? "",
     secretKey: env.CYBS_SA_SECRET_KEY ?? "",
+    endpoint: checkoutApiEndpoint,
+    integration: "checkout_api",
   };
 }
 
 /** Every merchant that actually has credentials configured. Never throws. */
 export function configuredMerchants(env: EnvMap): Merchant[] {
+  const checkoutApiEndpoint = env.CYBS_SA_ENDPOINT ?? "";
   const out: Merchant[] = [];
   if (env.CYBS_SA_PROFILE_ID && env.CYBS_SA_SECRET_KEY) {
     out.push({
@@ -79,6 +111,8 @@ export function configuredMerchants(env: EnvMap): Merchant[] {
       profileId: env.CYBS_SA_PROFILE_ID,
       accessKey: env.CYBS_SA_ACCESS_KEY ?? "",
       secretKey: env.CYBS_SA_SECRET_KEY,
+      endpoint: checkoutApiEndpoint,
+      integration: "checkout_api",
     });
   }
   if (env.CYBS_SA_CUP_PROFILE_ID && env.CYBS_SA_CUP_SECRET_KEY) {
@@ -87,6 +121,8 @@ export function configuredMerchants(env: EnvMap): Merchant[] {
       profileId: env.CYBS_SA_CUP_PROFILE_ID,
       accessKey: env.CYBS_SA_CUP_ACCESS_KEY ?? "",
       secretKey: env.CYBS_SA_CUP_SECRET_KEY,
+      endpoint: env.CYBS_SA_CUP_ENDPOINT || hostedEndpointFrom(checkoutApiEndpoint),
+      integration: "hosted",
     });
   }
   return out;

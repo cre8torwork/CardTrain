@@ -33,6 +33,81 @@ contact your bank…"* instead.
 > command any time: `CYBS_SA_* node scripts/sa-matrix.mjs` (creds via env, never
 > committed).
 
+## ✅ UnionPay (…204) — both cases PASS in the browser (2026-08-13)
+
+Run through the **real deployed checkout page** at cardtrain.net, payer auth left ON.
+
+| Case | Amount | Reason | Decision | Reference # | CyberSource txn |
+|---|---|---|---|---|---|
+| 1 | HK$9000.91 | **150** | ERROR | `CTMSQYOIZAD8EFE0` | `7865919024516299004007` |
+| 2 | HK$9000.51 | **204** | DECLINE | `CTMSQYQQBJ273869` | `7865920289156296904008` |
+
+Sensitive-wording rule proven again on …204: for case 2 the gateway's own message is
+*"Insufficient available balance"*, while the confirmation page shows *"Transaction
+rejected, please contact your bank…"*.
+
+Screenshots for the deck: `~/Desktop/CardTrain-GPAP-UnionPay/`.
+
+⚠️ **3DS is non-deterministic.** Both passing runs went *frictionless* — no challenge.
+An earlier attempt on the same card DID draw an OTP challenge, so the deck may need a
+challenge screenshot captured on a run that happens to produce one. See the iframe bug
+below, which must be deployed before any challenge run can succeed.
+
+### The bug this run exposed — 3DS challenge was unsubmittable
+
+`CardPaymentFrame` pinned the payment iframe at `h-[420px]`. The ACS picks one of the
+standard 3-D Secure challenge sizes (250x400, 390x400, 500x600, 600x400, full-screen),
+so a challenge can be 600px tall. At 420px the UnionPay challenge rendered with its
+**SUBMIT / RESEND / CANCEL buttons below the clip line** — unreachable. The customer
+could never authenticate, CyberSource never posted a result, and the order sat at
+`pending` with only a `sign` event and a null `cybersource_request_id`.
+
+This is customer-facing, not just a test problem: any UnionPay buyer who draws a
+challenge cannot pay. Fixed by raising the frame to `h-[640px]`.
+
+## ⏸️ Earlier: blocked at 3-D Secure (headless)
+
+The UnionPay plan is driven by amounts whose **cents** are the trigger. Nothing in the
+Buy Points UI can produce them — custom points take whole CTP and divide by 10, so HKD
+never carries more than one decimal place. So the run seeds an order at an exact
+`amount_minor` and calls the deployed signer.
+
+Test data — card `6210032578574424`, exp **11-2030**, CVV `123`:
+
+| # | Amount | Expected reason code | Expected message on confirmation page |
+|---|---|---|---|
+| 1 | HK$9000.91 | **150** | Transaction unsuccessful, please try again... (Reference Number: …) |
+| 2 | HK$9000.51 | **204** | Transaction rejected, please contact your bank… (Reference Number: …) |
+
+Same trigger digits as the Visa/Mastercard plan's 4091 and 4051, moved into the cents.
+
+```
+SB_SERVICE=<service_role> SA_CUP_CARD=6210032578574424 \
+  node scripts/sa-cup-order-matrix.mjs
+```
+
+| Case | Amount | Signed as | Result |
+|---|---|---|---|
+| 1 | HK$9000.91 | `9000.91` | 302 → `/silent/payer_authentication/hybrid` |
+| 2 | HK$9000.51 | `9000.51` | 302 → `/silent/payer_authentication/hybrid` |
+
+**Proven by this run:** the odd-cent amounts round-trip into the signature exactly
+(`amount_minor` 900091 → signed `"9000.91"`); the …204 merchant routing is correct;
+and the billing-address fix holds — **no reason_code 101**, which was the previous
+failure.
+
+**Blocker:** Payer Authentication is **ON** on the …204 profile, so the gateway hands
+off to 3DS before the amount is ever evaluated. Same trap as …200, and the same fix:
+turn Payer Authentication **OFF** on the profile, then **PROMOTE** it — an unpromoted
+edit lands on the inactive copy and looks like nothing happened. (Re-enable 3DS after
+the gate; it is a production concern.)
+
+Two scripts exist, deliberately:
+- `scripts/sa-cup-matrix.mjs` — signs locally from `CYBS_SA_CUP_*`. Needs the …204
+  secrets in hand.
+- `scripts/sa-cup-order-matrix.mjs` — seeds the order and lets the **deployed**
+  `sign-checkout` sign it. Needs no secret and tests the real production path.
+
 ## Prerequisites (all must be true before starting)
 
 - [x] Secure Acceptance **Profile ID / Access Key / Secret Key** set as Supabase

@@ -41,12 +41,21 @@ const YEARS = Array.from({ length: 11 }, (_, i) => String(CURRENT_YEAR + i));
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 
 /**
- * Secure Acceptance (Silent Order POST) card form. The signed fields are hidden
- * inputs; the customer's card fields post DIRECTLY to CyberSource (cross-origin),
- * so card data never touches our servers. On submit the browser leaves for
- * CyberSource, which returns to our checkout-response receipt endpoint.
+ * Secure Acceptance card form, in two shapes:
+ *
+ *  - `checkout_api` (Visa/Mastercard, …200) — we render the card fields and they
+ *    post DIRECTLY to CyberSource (cross-origin), so card data never touches our
+ *    servers.
+ *  - `hosted` (UnionPay, …204) — CyberSource renders its OWN payment page and
+ *    collects the card there. We post only the signed fields. GPAP requires this
+ *    merchant to run Hosted Checkout, which EBC logs as the transaction's Client
+ *    Application. Rendering our own card inputs here would both be pointless (the
+ *    hosted page asks again) and actively break the request: every name declared
+ *    in `unsigned_field_names` must be present, and under hosted we declare none.
+ *
+ * Either way the POST targets an iframe, so the top-level page never navigates.
  */
-export default function CardPaymentForm({ endpoint, fields, amountLabel, target, onSubmitted, network = 'visa' }: CardPaymentFormProps) {
+export default function CardPaymentForm({ endpoint, fields, integration, amountLabel, target, onSubmitted, network = 'visa' }: CardPaymentFormProps) {
   const { t } = useTranslation();
   const [number, setNumber] = useState('');
   const [month, setMonth] = useState('');
@@ -94,6 +103,44 @@ export default function CardPaymentForm({ endpoint, fields, amountLabel, target,
   };
 
   const input = 'w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent';
+
+  // Hosted Checkout: hand the signed set straight over and let CyberSource collect
+  // the card. Nothing to validate here — there are no inputs to validate.
+  if (integration === 'hosted') {
+    return (
+      <form
+        method="POST"
+        action={endpoint}
+        target={target}
+        onSubmit={() => onSubmitted?.()}
+        className="space-y-3 text-left"
+      >
+        {Object.entries(fields).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
+
+        <p className="flex items-start gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+          <i className="ri-bank-card-2-line text-blue-500 flex-shrink-0 mt-0.5"></i>
+          {t('buyPoints.hostedCardNote')}
+        </p>
+
+        {/* 3-D Secure programme marks, close to the CHECKOUT button (GPAP requirement) */}
+        <SecureBadges className="pt-1" />
+
+        <button
+          type="submit"
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg whitespace-nowrap cursor-pointer"
+        >
+          <i className="ri-lock-line text-lg"></i>
+          {t('buyPoints.hostedContinue', { amount: amountLabel })}
+        </button>
+        <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
+          <i className="ri-shield-check-line text-emerald-500"></i>
+          {t('buyPoints.securedByCybersource')}
+        </p>
+      </form>
+    );
+  }
 
   return (
     <form method="POST" action={endpoint} target={target} onSubmit={handleSubmit} className="space-y-3 text-left">

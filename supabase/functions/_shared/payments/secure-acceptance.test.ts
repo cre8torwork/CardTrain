@@ -144,3 +144,45 @@ test('a PARTIAL address is dropped, never half-signed', async () => {
   assert.ok(!fields.signed_field_names.includes('bill_to_address_line1'));
   assert.ok(fields.unsigned_field_names.includes('bill_to_address_line1'));
 });
+
+// ── Hosted Checkout (UnionPay …204) ──
+// Hosted collects the card on CyberSource's page. Every name in
+// unsigned_field_names must be PRESENT in the POST, so declaring card fields we
+// will never send makes the gateway answer 403 on every endpoint.
+
+test('hosted declares NO unsigned fields at all', async () => {
+  const f = await buildSignedRequestFields(
+    { ...baseInput, integration: 'hosted', requireBillingAddress: true },
+    SECRET,
+  );
+  assert.equal(f.unsigned_field_names, '');
+  assert.equal(f.signed_field_names.includes('bill_to_address_line1'), false);
+});
+
+test('hosted still signs an address the order already carries (prefills the hosted page)', async () => {
+  const f = await buildSignedRequestFields(
+    {
+      ...baseInput,
+      integration: 'hosted',
+      billTo: { ...baseInput.billTo, addressLine1: '1 Connaught Road Central', city: 'Central', country: 'HK' },
+    },
+    SECRET,
+  );
+  assert.equal(f.unsigned_field_names, '');
+  assert.equal(f.signed_field_names.includes('bill_to_address_line1'), true);
+  assert.equal(await verifyResponseSignature(f, SECRET), true);
+});
+
+test('hosted signatures still verify', async () => {
+  const f = await buildSignedRequestFields({ ...baseInput, integration: 'hosted' }, SECRET);
+  assert.equal(await verifyResponseSignature(f, SECRET), true);
+});
+
+test('switching UnionPay to hosted did NOT change the Visa/Mastercard field set', async () => {
+  // The …200 connectivity test already passed on this exact signature. Any drift
+  // here silently invalidates it.
+  const explicit = await buildSignedRequestFields({ ...baseInput, integration: 'checkout_api' }, SECRET);
+  const defaulted = await buildSignedRequestFields({ ...baseInput }, SECRET);
+  assert.equal(explicit.unsigned_field_names, 'card_type,card_number,card_expiry_date,card_cvn');
+  assert.deepEqual(explicit, defaulted);
+});

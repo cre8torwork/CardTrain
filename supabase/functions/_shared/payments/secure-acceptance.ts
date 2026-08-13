@@ -81,8 +81,24 @@ export interface SignedRequestInput {
    * the browser form can collect them — an unsigned field is still covered by
    * the signature, because `unsigned_field_names` is itself signed, so a
    * customer can add an address but cannot add a field we did not allow.
+   *
+   * Ignored under `hosted`, where CyberSource's own page collects the address.
    */
   requireBillingAddress?: boolean;
+  /**
+   * Which Secure Acceptance integration this field set is built for.
+   *
+   * `hosted` (Hosted Checkout, POST /pay) means CyberSource collects the card —
+   * and any missing billing address — on its own page, so we must declare NO
+   * unsigned fields at all. Declaring card fields we then never send is not
+   * harmless: every name in `unsigned_field_names` must be PRESENT in the POST or
+   * the gateway answers 403 on every endpoint, which looks exactly like a
+   * misconfigured profile and sends you chasing the wrong thing.
+   *
+   * Defaults to `checkout_api` (Silent Order POST, /silent/pay) — the Visa/
+   * Mastercard path, whose signature must stay byte-identical.
+   */
+  integration?: 'checkout_api' | 'hosted';
 }
 
 /** Build the exact string that gets HMAC-signed, in signed_field_names order. */
@@ -119,10 +135,16 @@ export async function buildSignedRequestFields(
     bill_to_address_country: input.billTo.country?.trim() ?? '',
   };
   const haveAddress = BILLING_ADDRESS_FIELD_NAMES.every((n) => address[n]);
+  const hosted = input.integration === 'hosted';
   const signedNames = haveAddress
     ? [...SIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES]
     : [...SIGNED_FIELD_NAMES];
-  const unsignedNames = !haveAddress && input.requireBillingAddress
+  // Hosted Checkout collects the card (and any missing address) on CyberSource's
+  // own page, so nothing is left for the browser to add — declare no unsigned
+  // fields rather than naming fields that will never be sent.
+  const unsignedNames = hosted
+    ? ''
+    : !haveAddress && input.requireBillingAddress
     ? [UNSIGNED_FIELD_NAMES, ...BILLING_ADDRESS_FIELD_NAMES].join(',')
     : UNSIGNED_FIELD_NAMES;
 
