@@ -26,7 +26,7 @@ interface CardPaymentFrameProps extends SignedCheckout {
   onOutcome: (outcome: PaymentOutcome) => void;
 }
 
-export default function CardPaymentFrame({ endpoint, fields, amountLabel, network, onOutcome }: CardPaymentFrameProps) {
+export default function CardPaymentFrame({ endpoint, fields, integration, amountLabel, network, onOutcome }: CardPaymentFrameProps) {
   const { t } = useTranslation();
   const [processing, setProcessing] = useState(false);
 
@@ -67,6 +67,7 @@ export default function CardPaymentFrame({ endpoint, fields, amountLabel, networ
         <CardPaymentForm
           endpoint={endpoint}
           fields={fields}
+          integration={integration}
           amountLabel={amountLabel}
           network={network}
           target={FRAME_NAME}
@@ -81,11 +82,17 @@ export default function CardPaymentFrame({ endpoint, fields, amountLabel, networ
         </p>
       )}
 
-      {/* Visible while processing so a 3-D Secure challenge can be completed in place. */}
+      {/* Visible while processing so a 3-D Secure challenge can be completed in place.
+          The height must clear the TALLEST standard 3-D Secure challenge window: the
+          ACS picks one of 250x400, 390x400, 500x600, 600x400 or full-screen, so the
+          content can be 600px tall. At the old 420px the UnionPay challenge rendered
+          with its Submit button BELOW the clip line — unreachable, so the customer
+          could never authenticate, CyberSource never posted a result back, and the
+          order sat at `pending` forever carrying only a `sign` event. */}
       <iframe
         name={FRAME_NAME}
         title="Secure payment"
-        className={processing ? 'w-full h-[420px] rounded-xl border border-gray-200' : 'hidden'}
+        className={processing ? 'w-full h-[640px] rounded-xl border border-gray-200' : 'hidden'}
       />
     </div>
   );
